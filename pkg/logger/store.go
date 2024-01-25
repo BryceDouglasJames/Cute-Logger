@@ -22,7 +22,7 @@ type store struct {
 }
 
 // Default settings for store
-func defaultOptions() *Options {
+func DefaultOptions() *Options {
 	return &Options{
 		BufferSize: 4096, // Default buffer size
 		File:       nil,  // nil pointer
@@ -48,7 +48,7 @@ func WithBufferSize(size uint64) StoreOptions {
 // The function applies a series of StoreOptions functions to configure the store.
 func NewStore(f *os.File, optFns ...StoreOptions) (filestore *store, err error) {
 	// Set options
-	opts := defaultOptions()
+	opts := DefaultOptions()
 	for _, fn := range optFns {
 		fn(opts)
 	}

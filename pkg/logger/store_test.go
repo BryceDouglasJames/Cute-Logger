@@ -7,16 +7,16 @@ import (
 
 func TestNewStoreWithValidFile(t *testing.T) {
 	// Create a temporary file
-	tmpfile, err := os.CreateTemp("", "*.log")
+	tmpFile, err := os.CreateTemp("", "*.log")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
 
 	// Clean up
-	defer os.Remove(tmpfile.Name())
+	defer os.Remove(tmpFile.Name())
 
 	// Test creating a new store with the temp file
-	_, err = NewStore(tmpfile, WithBufferSize(4096)) // 4 KB page
+	_, err = NewStore(tmpFile, WithBufferSize(4096)) // 4 KB page
 	if err != nil {
 		t.Errorf("Failed to create new store: %v", err)
 	}
@@ -35,19 +35,19 @@ func TestNewStoreWithNilFile(t *testing.T) {
 	}
 
 	// Create a temporary file
-	tmpfile, err := os.CreateTemp("", "*.log")
+	tmpFile, err := os.CreateTemp("", "*.log")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
 
 	// Clean up
-	defer os.Remove(tmpfile.Name())
+	defer os.Remove(tmpFile.Name())
 
 	// Assign file
-	store.File = tmpfile
+	store.File = tmpFile
 
 	// Verify that the file in the store is correctly assigned
-	if store.File != tmpfile {
-		t.Errorf("Expected file in store to be %v, got: %v", tmpfile, store.File)
+	if store.File != tmpFile {
+		t.Errorf("Expected file in store to be %v, got: %v", tmpFile, store.File)
 	}
 }
