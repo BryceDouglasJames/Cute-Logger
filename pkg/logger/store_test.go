@@ -51,3 +51,39 @@ func TestNewStoreWithNilFile(t *testing.T) {
 		t.Errorf("Expected file in store to be %v, got: %v", tmpFile, store.File)
 	}
 }
+
+func TestStoreAppend(t *testing.T) {
+	// Create a temporary file for testing
+	tmpfile, err := os.CreateTemp("", "store_append_test.*.log")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+
+	// Clean up the file after the test
+	defer os.Remove(tmpfile.Name())
+
+	// Create a new store with the temporary file
+	store, err := NewStore(tmpfile)
+	if err != nil {
+		t.Fatalf("Failed to create new store: %v", err)
+	}
+
+	// Define a test page to append
+	testPage := []byte("test log data")
+
+	// Append the test page to the store
+	written, pos, err := store.Append(testPage)
+	if err != nil {
+		t.Fatalf("Failed to append to store: %v", err)
+	}
+
+	// Check if the returned position is correct (should be 0 for the first write)
+	if pos != 0 {
+		t.Errorf("Expected position 0, got %d", pos)
+	}
+
+	// Check if the number of written bytes is correct
+	if written != uint64(len(testPage)+wordLength) {
+		t.Errorf("Expected %d bytes written, got %d", len(testPage)+wordLength, written)
+	}
+}
