@@ -3,6 +3,7 @@ package logger
 import (
 	"bufio"
 	"encoding/binary"
+	"errors"
 	"os"
 	"sync"
 )
@@ -11,6 +12,14 @@ var (
 	enc        = binary.BigEndian
 	wordLength = 8
 )
+
+// These options are good to start with
+// Will look into other options as time moves on.
+// Options like:
+//	- Asynchronous Writing
+//	- Compression
+//	- File Rollover
+//	- Auto-Flush Interval
 
 type Options struct {
 	BufferSize uint64
@@ -53,52 +62,45 @@ func WithBufferSize(size uint64) StoreOptions {
 // Creates a new store with the given options.
 // It initializes a store with a buffer of the specified size and associates it with the provided file, if any.
 // The function applies a series of StoreOptions functions to configure the store.
-func NewStore(f *os.File, optFns ...StoreOptions) (filestore *Store, err error) {
-	// Set options
+func NewStore(optFns ...StoreOptions) (filestore *Store, err error) {
+	// Initialize with default options.
 	opts := DefaultOptions()
+
+	// Apply each provided option to the default options.
 	for _, fn := range optFns {
 		fn(opts)
 	}
 
-	// Create new store instance
-	newStore := &Store{}
+	var file *os.File
 
-	if opts.File != nil {
-		// Verify file from options
-		file, err := os.Stat(opts.File.Name())
+	// Check if a custom file is provided in options.
+	if opts.File == nil {
+		// No custom file provided, use a default file path.
+		defaultFilePath := "default.log"
+		// Open the default file, create if it does not exist, and set it to append mode.
+		file, err = os.OpenFile(defaultFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			return nil, err
+			return nil, err // Return an error if the file cannot be opened or created.
 		}
-		newStore.File = opts.File
-
-		// Add mutex to store
-		newStore.mu = sync.Mutex{}
-
-		// Buffer to fit file size
-		fileSize := uint64(file.Size())
-		newStore.size = fileSize
-
-		buf := bufio.NewWriterSize(opts.File, int(fileSize))
-		newStore.buf = buf
-
-		// Return store with passed reference pointer
-		return newStore, nil
+	} else {
+		// Use the custom file provided in the options.
+		file = opts.File
 	}
 
-	// Use the buffer size specified in options for the buffered writer.
-	// This allows for flexible configuration of the buffer size,
-	// which can be optimized based on the expected file I/O workload.
-	// For instance, setting it to the size of a standard page can optimize for page-aligned I/O.
-	bufSize := opts.BufferSize
-	buf := bufio.NewWriterSize(f, int(bufSize))
-	newStore.buf = buf
-	newStore.mu = sync.Mutex{}
+	// Create a buffered writer with the specified buffer size
+	buf := bufio.NewWriterSize(file, int(opts.BufferSize))
 
-	return newStore, nil
+	// Return a new Store instance
+	return &Store{
+		File: file,
+		buf:  buf,
+		mu:   sync.Mutex{},
+		size: 0, // Initial store size is 0.
+	}, nil
 
 }
 
-func (store *Store) Append(page []byte) (size uint64, pos uint64, err error) {
+func (store *Store) Append(entry []byte) (size uint64, pos uint64, err error) {
 	// Lock the store to prevent concurrent writes
 	store.mu.Lock()
 	defer store.mu.Unlock()
@@ -109,12 +111,12 @@ func (store *Store) Append(page []byte) (size uint64, pos uint64, err error) {
 
 	// Write the length of the page first as a prefix
 	// This length prefix allows for knowing how much to read during retrieval
-	if err := binary.Write(store.buf, enc, uint64(len(page))); err != nil {
-		return 0, 0, nil
+	if err := binary.Write(store.buf, enc, uint64(len(entry))); err != nil {
+		return 0, 0, err
 	}
 
 	// Write the contents of the page to the store
-	written, err := store.buf.Write(page)
+	written, err := store.buf.Write(entry)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -130,4 +132,46 @@ func (store *Store) Append(page []byte) (size uint64, pos uint64, err error) {
 	}
 
 	return totalWritten, position, nil
+}
+
+func (store *Store) Read(pos uint64) ([]byte, error) {
+	// Lock the store to prevent concurrent reads
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	// Even if the client gave the option to not have a file initially,
+	// there still must be a file to read from they they have designated
+	if store.File == nil {
+		return nil, errors.New("store file is nil")
+	}
+
+	// Check if the file actually exists
+	fileInfo, err := store.File.Stat()
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if the position is within the file bounds
+	if int64(pos) >= fileInfo.Size() || int64(pos)+int64(wordLength) > fileInfo.Size() {
+		return nil, errors.New("position out of file bounds")
+	}
+
+	// Read the size of the data first
+	sizeBuffer := make([]byte, wordLength)
+	if _, err := store.File.ReadAt(sizeBuffer, int64(pos)); err != nil {
+		return nil, err
+	}
+
+	// Decode the size using the same encoding used in writing
+	dataSize := enc.Uint64(sizeBuffer)
+
+	// Allocate a slice to hold the actual data
+	data := make([]byte, dataSize)
+
+	// Read the actual data
+	if _, err := store.File.ReadAt(data, int64(pos)+int64(wordLength)); err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }
