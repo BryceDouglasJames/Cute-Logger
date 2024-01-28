@@ -175,3 +175,24 @@ func (store *Store) Read(pos uint64) ([]byte, error) {
 
 	return data, nil
 }
+
+// TODO: Add test
+func (store *Store) Close() error {
+	// Lock the store to prevent any more actions
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	// First, flush any data in the buffer to ensure all
+	// written data is saved to the file.
+	if err := store.buf.Flush(); err != nil {
+		return err
+	}
+
+	// Close the file after flushing the buffer
+	//This ensures that all buffered data is safely written to the file
+	if err := store.File.Close(); err != nil {
+		return err
+	}
+
+	return nil
+}
