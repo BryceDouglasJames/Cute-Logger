@@ -25,6 +25,7 @@ type Options struct {
 	BufferSize uint64
 	File       *os.File
 	FilePath   string
+	IsOpen     bool
 }
 
 // Represents a function that applies configuration options to an Options instance
@@ -41,8 +42,9 @@ type Store struct {
 // Default settings for store
 func DefaultOptions() *Options {
 	return &Options{
-		BufferSize: 4096, // Default buffer size
-		File:       nil,  // nil pointer
+		BufferSize: 4096,            // Default buffer size
+		File:       nil,             // nil pointer
+		FilePath:   "./default.txt", // destination of temp generate
 	}
 }
 
@@ -81,22 +83,24 @@ func NewStore(optFns ...StoreOptions) (filestore *Store, err error) {
 
 	var file *os.File
 
-	if opts.FilePath != "" {
-		// FilePath has the highest priority
-		file, err = os.OpenFile(opts.FilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			return nil, err
-		}
-	} else if opts.File == nil { // Check if a custom file is provided in options
-		// No custom file provided, use a default file path
-		defaultFilePath := "default.log"
+	// Check if a custom file is provided in options
+	if opts.File == nil {
 		// Open the default file, create if it does not exist, and set it to append mode
-		file, err = os.OpenFile(defaultFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		file, err = os.OpenFile(opts.FilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			return nil, err // Return an error if the file cannot be opened or created
 		}
-	} else {
-		// Use the custom file provided in the options
+	} else if opts.File != nil {
+		// If the file is already open, check if it's usable
+		if _, err := opts.File.Stat(); err != nil {
+			return nil, err
+		}
+
+		// Optionally, reset the file's offset or ensure it's ready for use
+		if _, err := opts.File.Seek(0, os.SEEK_END); err != nil {
+			return nil, err
+		}
+
 		file = opts.File
 	}
 
@@ -189,7 +193,6 @@ func (store *Store) Read(pos uint64) ([]byte, error) {
 	return data, nil
 }
 
-// TODO: Add test
 func (store *Store) Close() error {
 	// Lock the store to prevent any more actions
 	store.mu.Lock()
@@ -200,6 +203,7 @@ func (store *Store) Close() error {
 	if err := store.buf.Flush(); err != nil {
 		return err
 	}
+	store.buf = nil
 
 	// Close the file after flushing the buffer
 	//This ensures that all buffered data is safely written to the file

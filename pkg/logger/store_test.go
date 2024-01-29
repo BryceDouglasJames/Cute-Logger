@@ -29,12 +29,12 @@ func TestNewStoreWithValidFileFirst(t *testing.T) {
 	}
 
 	// Check if the buffer size is set as expected
-	if store.buf.Size() != expectedBufferSize {
+	if !reflect.DeepEqual(store.buf.Size(), expectedBufferSize) {
 		t.Errorf("Expected buffer size to be %d, got %d", expectedBufferSize, store.buf.Size())
 	}
 
 	// Validate the file association
-	if store.File != tmpFile {
+	if !reflect.DeepEqual(store.File, tmpFile) {
 		t.Errorf("Store is not associated with the correct file")
 	}
 
@@ -74,7 +74,7 @@ func TestNewStoreWithNilFileFirst(t *testing.T) {
 	store.File = tmpFile
 
 	// Verify that the file in the store is correctly assigned
-	if store.File != tmpFile {
+	if !reflect.DeepEqual(store.File, tmpFile) {
 		t.Errorf("Expected file in store to be %v, got: %v", tmpFile, store.File)
 	}
 }
@@ -110,50 +110,110 @@ func TestStoreAppend(t *testing.T) {
 	}
 
 	// Check if the number of written bytes is correct
-	if written != uint64(len(testPage)+wordLength) {
+	if !reflect.DeepEqual(written, uint64(len(testPage)+wordLength)) {
 		t.Errorf("Expected %d bytes written, got %d", len(testPage)+wordLength, written)
 	}
 }
 
 func TestStoreRead(t *testing.T) {
-	// Create a temporary file for testing.
+	// Create a temporary file for testing
 	tmpfile, err := os.CreateTemp("", "store_read_test.log")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpfile.Name()) // Clean up after the test.
 
-	// Initialize a new Store with the temporary file.
+	// Clean up after the test
+	defer os.Remove(tmpfile.Name())
+
+	// Initialize a new Store with the temporary file
 	store, err := NewStore(WithFile(tmpfile))
 	if err != nil {
 		t.Fatalf("Failed to create new store: %v", err)
 	}
 
-	// Define a test page to append.
+	// Define a test page to append
 	testPage := []byte("test log data")
 
-	// Append the test page to the store and capture the total written amount and position.
+	// Append the test page to the store and capture the total written amount and position
 	totalWritten, pos, err := store.Append(testPage)
 	if err != nil {
 		t.Fatalf("Failed to append to store: %v", err)
 	}
 
-	// Check if the total written amount is correct.
+	// Check if the total written amount is correct
 	expectedTotalWritten := uint64(len(testPage)) + uint64(wordLength)
 	if totalWritten != expectedTotalWritten {
 		t.Errorf("Expected total written amount to be %d, got %d", expectedTotalWritten, totalWritten)
 	}
 
-	// Read the data back from the store.
+	// Read the data back from the store
 	readData, err := store.Read(pos)
 	if err != nil {
 		t.Fatalf("Failed to read from store: %v", err)
 	}
 
-	// Verify that the read data matches the written data.
+	// Verify that the read data matches the written data
 	if !reflect.DeepEqual(readData, testPage) {
 		t.Errorf("Read data does not match written data. Got %v, want %v", readData, testPage)
 	}
+}
+
+func TestStoreClose(t *testing.T) {
+	// Create a temporary file path
+	tmpFile, err := os.CreateTemp("", "store_close_*.log")
+	if err != nil {
+		t.Fatalf("Failed to create temporary file: %v", err)
+	}
+	tmpFilePath := tmpFile.Name()
+
+	// Clean up after the test
+	defer os.Remove(tmpFilePath)
+
+	// Initialize the Store with the file path
+	store, err := NewStore(WithFile(tmpFile), WithBufferSize(4096))
+	if err != nil {
+		t.Fatalf("Failed to initialize store: %v", err)
+	}
+
+	// Append the test page to the store and capture the total written amount and position
+	testEntry := []byte("test data")
+	_, _, err = store.Append(testEntry)
+	if err != nil {
+		t.Fatalf("Failed to append to store: %v", err)
+	}
+
+	// Grab file state before close
+	fileBefore, err := os.OpenFile(tmpFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		t.Fatalf("Failed to open up file %s: %v", tmpFilePath, err) // Return an error if the file cannot be opened or created
+	}
+	beforeInfo, err := fileBefore.Stat()
+	if err != nil {
+		t.Fatalf("Troble grabbing file info from %s: %v", tmpFilePath, err)
+	}
+	beforeSize := beforeInfo.Size()
+
+	// Ensure the store is closed properly to flush any buffered data
+	if err := store.Close(); err != nil {
+		t.Fatalf("Failed to close store: %v", err)
+	}
+
+	// Grab file state after close
+	fileAfter, err := os.OpenFile(tmpFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		t.Fatalf("Failed to open up file %s: %v", tmpFilePath, err) // Return an error if the file cannot be opened or created
+	}
+	afterInfo, err := fileAfter.Stat()
+	if err != nil {
+		t.Fatalf("Trouble grabbing file info from %s: %v", tmpFilePath, err)
+	}
+	afterSize := afterInfo.Size()
+
+	// Ensure store has flushed everything into the file
+	if afterSize < beforeSize {
+		t.Fatalf("The size of the file after store closure is not correct")
+	}
+
 }
 
 func TestStoreInitializationWithFilePath(t *testing.T) {
