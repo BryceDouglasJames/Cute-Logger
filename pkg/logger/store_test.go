@@ -155,3 +155,26 @@ func TestStoreRead(t *testing.T) {
 		t.Errorf("Read data does not match written data. Got %v, want %v", readData, testPage)
 	}
 }
+
+func TestStoreInitializationWithFilePath(t *testing.T) {
+	// Create a temporary file for testing
+	tmpFile, err := os.CreateTemp("", "example_*.log")
+	if err != nil {
+		t.Fatalf("Failed to create temporary file: %v", err)
+	}
+
+	// Clean up
+	defer os.Remove(tmpFile.Name())
+
+	// Close the file as NewStore will open it
+	tmpFile.Close()
+
+	store, err := NewStore(WithFilePath(tmpFile.Name()))
+	if err != nil {
+		t.Fatalf("Failed to create store with file path: %v", err)
+	}
+
+	if err := store.Close(); err != nil {
+		t.Errorf("Failed to close store: %v", err)
+	}
+}

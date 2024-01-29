@@ -24,6 +24,7 @@ var (
 type Options struct {
 	BufferSize uint64
 	File       *os.File
+	FilePath   string
 }
 
 // Represents a function that applies configuration options to an Options instance
@@ -52,7 +53,14 @@ func WithFile(f *os.File) StoreOptions {
 	}
 }
 
-// Set the size of the buffer used by the store.
+// Specifies the file path for the store's backing file
+func WithFilePath(path string) StoreOptions {
+	return func(opts *Options) {
+		opts.FilePath = path
+	}
+}
+
+// Set the size of the buffer used by the store
 func WithBufferSize(size uint64) StoreOptions {
 	return func(opts *Options) {
 		opts.BufferSize = size
@@ -66,24 +74,29 @@ func NewStore(optFns ...StoreOptions) (filestore *Store, err error) {
 	// Initialize with default options.
 	opts := DefaultOptions()
 
-	// Apply each provided option to the default options.
+	// Apply each provided option to the default options
 	for _, fn := range optFns {
 		fn(opts)
 	}
 
 	var file *os.File
 
-	// Check if a custom file is provided in options.
-	if opts.File == nil {
-		// No custom file provided, use a default file path.
+	if opts.FilePath != "" {
+		// FilePath has the highest priority
+		file, err = os.OpenFile(opts.FilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			return nil, err
+		}
+	} else if opts.File == nil { // Check if a custom file is provided in options
+		// No custom file provided, use a default file path
 		defaultFilePath := "default.log"
-		// Open the default file, create if it does not exist, and set it to append mode.
+		// Open the default file, create if it does not exist, and set it to append mode
 		file, err = os.OpenFile(defaultFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			return nil, err // Return an error if the file cannot be opened or created.
+			return nil, err // Return an error if the file cannot be opened or created
 		}
 	} else {
-		// Use the custom file provided in the options.
+		// Use the custom file provided in the options
 		file = opts.File
 	}
 
