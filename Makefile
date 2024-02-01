@@ -1,2 +1,2 @@
 test:
-	go test -race ./pkg/logger
+	go test -race ./pkg/logger/store
