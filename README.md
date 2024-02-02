@@ -31,10 +31,26 @@ This project develops a comprehensive log system focusing on scalability, effici
 
 
 ### [Index](#)
+Indexes provide a way to quickly locate data within segments. An index entry will point to the location of data within a segment, significantly speeding up the retrieval of data without scanning entire segments.
 
+Feature Considerations/Plans:
+
+❌ Index Types: Support different index types (e.g., B-Tree Indexing, Bloom Filters) to optimize for various query patterns and performance needs.
+
+✅ Memory Mapping: Utilize memory-mapped files for indexes to improve read performance, especially for large indexes. Currently being achieved by [this go module](https://github.com/tysonmote/gommap/tree/master)
+
+❌ Dynamic Indexing: Allow dynamic index creation and modification to support evolving data structures and query requirements without significant downtime.
 
 ### [Segment](#)
+These are typically larger blocks of data or files that store the actual data entries (e.g., log records). Segments help in organizing data in a way that is manageable and scalable, allowing systems to append new data efficiently and, when necessary, perform compaction or deletion on older segments.
 
+Feature Considerations/Plans:
+
+❌ Segment Compaction: Implement segment compaction to merge segments and remove redundant or obsolete data, optimizing storage usage and improving query performance.
+
+❌ Segment Caching: Explore caching frequently accessed segments in memory to speed up data retrieval.
+
+❌ Write-Ahead Logging: Consider integrating a WAL mechanism for segments to ensure data integrity and allow for recovery in case of unexpected failures.
 
 ### [Log](#)
 
