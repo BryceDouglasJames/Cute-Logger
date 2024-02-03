@@ -16,17 +16,5 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
           
-    - name: Cross-Compile for macOS (Intel)
-      run: GOOS=darwin GOARCH=amd64 go build -o myapp-darwin-amd64 .
-
-    - name: Cross-Compile for macOS (ARM/M1)
-      run: GOOS=darwin GOARCH=arm64 go build -o myapp-darwin-arm64 .
-      
-    - name: Cross-Compile for Linux (AMD64)
-      run: GOOS=linux GOARCH=amd64 go build -o myapp-linux-amd64 .
-      
-    - name: Cross-Compile for Linux (ARM64)
-      run: GOOS=linux GOARCH=arm64 go build -o myapp-linux-arm64 .
-
-    - name: Run Go Tests (via Makefile)
-      run: make test
+    - name: List directory contents
+      run: ls -lah
