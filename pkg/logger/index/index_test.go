@@ -59,7 +59,7 @@ func TestIndexClose(t *testing.T) {
 	defer os.Remove(tmpFile.Name())
 
 	// Initialize the Index with the temporary file
-	i, err := NewIndex(WithFile(tmpFile), WithMemoryMapping(true))
+	i, err := NewIndex(WithFile(tmpFile), WithMemoryMapping(true), WithAutoCreate(false))
 	if err != nil {
 		t.Fatalf("Failed to create Index: %v", err)
 	}

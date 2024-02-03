@@ -129,11 +129,12 @@ func NewIndex(optFns ...IndexOptions) (*Index, error) {
 		mmapProt := gommap.PROT_READ | gommap.PROT_WRITE
 		mmapFlags := gommap.MAP_SHARED
 
-		newIndex.mmap, err = gommap.Map(newIndex.file.Fd(), mmapProt, mmapFlags)
+		newMap, err := gommap.Map(newIndex.file.Fd(), mmapProt, mmapFlags)
 		if err != nil {
 			return nil, err
 		}
 		newIndex.UseMemoryMapping = true
+		newIndex.mmap = newMap
 	}
 
 	return newIndex, nil
@@ -145,6 +146,8 @@ func (i *Index) Close() error {
 		if err := i.mmap.Sync(gommap.MS_SYNC); err != nil {
 			return err
 		}
+	} else if len(i.mmap) == 0 {
+		i.mmap = nil
 	} else if i.UseMemoryMapping {
 		return errors.New("something is very wrong index mmap should not be nil")
 	}

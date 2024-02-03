@@ -1,5 +1,7 @@
 # Cute Logger
----
+
+![Build Status](https://github.com/BryceDouglasJames/Cute-Logger/actions/workflows/go-test.yaml/badge.svg) [![Go Report Card](https://goreportcard.com/badge/github.com/BryceDouglasJames/Cute-Logger)](https://goreportcard.com/report/github.com/BryceDouglasJames/Cute-Logger)
+
 ## Overview
 
 This project develops a comprehensive log system focusing on scalability, efficiency, and reliability. It's designed to manage sequential data records, suitable for applications ranging from logging to complex distributed event sourcing systems.

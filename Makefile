@@ -1,3 +1,2 @@
 test:
-	go test -race ./pkg/logger/store
-	go test -race ./pkg/logger/index
+	go test -race ./... -coverprofile=coverage.txt
