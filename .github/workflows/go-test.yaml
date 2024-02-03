@@ -3,17 +3,30 @@ name: Go Test
 on: [push, pull_request]
 
 jobs:
-  test:
-    name: Run Go Tests
+  build-and-test:
+    name: Build and Test
     runs-on: ubuntu-latest
+    
     steps:
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '^1.19'  # Use the version of Go in your project
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '^1.19'
+        
+    - name: Check out code
+      uses: actions/checkout@v4
+          
+    - name: Cross-Compile for macOS (Intel)
+      run: GOOS=darwin GOARCH=amd64 go build -o myapp-darwin-amd64 .
 
-      - name: Check out code
-        uses: actions/checkout@v4
+    - name: Cross-Compile for macOS (ARM/M1)
+      run: GOOS=darwin GOARCH=arm64 go build -o myapp-darwin-arm64 .
       
-      - name: Run Go Tests (via Makefile)
-        run: make test
+    - name: Cross-Compile for Linux (AMD64)
+      run: GOOS=linux GOARCH=amd64 go build -o myapp-linux-amd64 .
+      
+    - name: Cross-Compile for Linux (ARM64)
+      run: GOOS=linux GOARCH=arm64 go build -o myapp-linux-arm64 .
+
+    - name: Run Go Tests (via Makefile)
+      run: make test
