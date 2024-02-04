@@ -1,7 +1,9 @@
 package index
 
 import (
+	"encoding/binary"
 	"errors"
+	"io"
 	"os"
 
 	"github.com/tysonmote/gommap"
@@ -11,6 +13,8 @@ var (
 	offset      uint64 = 4
 	wordLength  uint64 = 8
 	entryLength        = offset + wordLength
+
+	enc = binary.BigEndian
 )
 
 type Options struct {
@@ -138,6 +142,34 @@ func NewIndex(optFns ...IndexOptions) (*Index, error) {
 	}
 
 	return newIndex, nil
+}
+
+func (i *Index) Read(in int64) (out uint32, pos uint64, err error) {
+	// If the index size is 0, return EOF to indicate no entries can be read
+	if i.size == 0 {
+		return 0, 0, io.EOF
+	}
+
+	// If in is -1, calculate the index of the last entry. Otherwise, use in as the index
+	if in == -1 {
+		out = uint32((i.size / entryLength) - 1)
+	} else {
+		out = uint32(in)
+	}
+
+	// Calculate the byte position of the entry within the memory-mapped file
+	pos = uint64(out) * entryLength
+
+	// If the calculated position is beyond the size of the index, return EOF
+	if i.size < pos+entryLength {
+		return 0, 0, io.EOF
+	}
+
+	// Read the entry value and position from the memory-mapped file
+	out = enc.Uint32(i.mmap[pos : pos+offset])
+	pos = enc.Uint64(i.mmap[pos+offset : pos+entryLength])
+
+	return out, pos, nil
 }
 
 func (i *Index) Close() error {
