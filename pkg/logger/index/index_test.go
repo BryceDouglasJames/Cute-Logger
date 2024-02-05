@@ -64,7 +64,7 @@ func TestIndexReadWrite(t *testing.T) {
 		t.Fatalf("Failed to create index with memory mapping enabled: %v", err)
 	}
 
-	// Schedule to clean up the temporary file after the test completes
+	// Clean up
 	defer os.Remove(tmpFile.Name())
 
 	// Verify that memory mapping was enabled in the index
@@ -109,7 +109,8 @@ func TestIndexReadWrite(t *testing.T) {
 			}
 
 			// Attempt to read back the entry/entries
-			out, pos, err := i.Read(int64(tt.wantOff - 1)) // Assuming 'off - 1' converts offset to index for Read.
+			// 'off - 1' converts offset to index for Read
+			out, pos, err := i.Read(int64(tt.wantOff - 1))
 			if err != tt.wantErr {
 				t.Errorf("%s: Read() error = %v, wantErr %v", tt.name, err, tt.wantErr)
 				return

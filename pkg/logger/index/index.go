@@ -3,6 +3,7 @@ package index
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 
@@ -135,16 +136,21 @@ func NewIndex(optFns ...IndexOptions) (*Index, error) {
 	}
 	newIndex.size = uint64(fi.Size())
 
+	fmt.Println(newIndex.file)
+
 	// Truncate new index into index file
-	if err = os.Truncate(opts.File.Name(), int64(opts.MaxIndexBytes)); err != nil {
+	if err = os.Truncate(newIndex.file.Name(), int64(opts.MaxIndexBytes)); err != nil {
 		return nil, err
 	}
 
 	// Attempt to memory-map the file if requested
+	//  *********** BE CAREFUL! ***********
+	//  Map creates a new mapping in the virtual address space of the calling process.
+	// 	May have unexpected bahvior depending on architecture
 	if opts.UseMemoryMapping {
 		// Ensure the file descriptor supports the intended memory map protections.
 		mmapProt := gommap.PROT_READ | gommap.PROT_WRITE
-		mmapFlags := gommap.MAP_SHARED
+		mmapFlags := gommap.MAP_SHARED | gommap.MAP_ANONYMOUS
 
 		newMap, err := gommap.Map(newIndex.file.Fd(), mmapProt, mmapFlags)
 		if err != nil {
