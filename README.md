@@ -1,6 +1,8 @@
+<div align="center">
 # Cute Logger
 
 ![Build Status](https://github.com/BryceDouglasJames/Cute-Logger/actions/workflows/go-test.yaml/badge.svg) [![Go Report Card](https://goreportcard.com/badge/github.com/BryceDouglasJames/Cute-Logger)](https://goreportcard.com/report/github.com/BryceDouglasJames/Cute-Logger)
+</div>
 
 ## Overview
 
