@@ -22,6 +22,7 @@ type Options struct {
 	FilePath         string
 	UseMemoryMapping bool
 	AutoCreate       bool
+	MaxIndexBytes    uint64
 }
 
 // Represents a function that applies configuration options to an Options instance
@@ -41,6 +42,7 @@ func DefaultOptions() *Options {
 		FilePath:         "./default.txt", // destination of temp generate
 		UseMemoryMapping: false,
 		AutoCreate:       true,
+		MaxIndexBytes:    1024,
 	}
 }
 
@@ -69,6 +71,13 @@ func WithAutoCreate(autoCreate bool) IndexOptions {
 func WithMemoryMapping(use bool) IndexOptions {
 	return func(opts *Options) {
 		opts.UseMemoryMapping = use
+	}
+}
+
+// Sets the maximum number of bytes for the index file itself.
+func WithMaxIndexBytes(maxIndexBytes uint64) IndexOptions {
+	return func(opts *Options) {
+		opts.MaxIndexBytes = maxIndexBytes
 	}
 }
 
@@ -113,6 +122,7 @@ func NewIndex(optFns ...IndexOptions) (*Index, error) {
 		}
 
 		newIndex.file = opts.File
+		opts.FilePath = opts.File.Name()
 	} else {
 		// No file or file path provided
 		return nil, os.ErrInvalid
@@ -125,7 +135,12 @@ func NewIndex(optFns ...IndexOptions) (*Index, error) {
 	}
 	newIndex.size = uint64(fi.Size())
 
-	// TODO: Add Segment Management
+	/* Truncate new index into index file
+	if err = os.Truncate(fi.Name(), int64(opts.MaxIndexBytes)); err != nil {
+		fmt.Println("NOO")
+		return nil, err
+	}
+	*/
 
 	// Attempt to memory-map the file if requested
 	if opts.UseMemoryMapping {
@@ -142,6 +157,24 @@ func NewIndex(optFns ...IndexOptions) (*Index, error) {
 	}
 
 	return newIndex, nil
+}
+
+func (i *Index) Write(off uint32, pos uint64) error {
+	// Check if there's enough space left in the memory-mapped file to write a new entry
+	if uint64(len(i.mmap)) < i.size+entryLength {
+		return io.EOF
+	}
+
+	// Write the offset value to the memory-mapped file at the current size position
+	enc.PutUint32(i.mmap[i.size:i.size+offset], off)
+
+	// Write the position value immediately after offset in the memory-mapped file
+	enc.PutUint64(i.mmap[i.size+offset:i.size+entryLength], pos)
+
+	// Increase size counter for index
+	i.size += uint64(entryLength)
+
+	return nil
 }
 
 func (i *Index) Read(in int64) (out uint32, pos uint64, err error) {
