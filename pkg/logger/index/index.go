@@ -135,12 +135,10 @@ func NewIndex(optFns ...IndexOptions) (*Index, error) {
 	}
 	newIndex.size = uint64(fi.Size())
 
-	/* Truncate new index into index file
-	if err = os.Truncate(fi.Name(), int64(opts.MaxIndexBytes)); err != nil {
-		fmt.Println("NOO")
+	// Truncate new index into index file
+	if err = os.Truncate(opts.File.Name(), int64(opts.MaxIndexBytes)); err != nil {
 		return nil, err
 	}
-	*/
 
 	// Attempt to memory-map the file if requested
 	if opts.UseMemoryMapping {
