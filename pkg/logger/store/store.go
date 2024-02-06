@@ -42,9 +42,9 @@ type Store struct {
 // Default settings for store
 func DefaultOptions() *Options {
 	return &Options{
-		BufferSize: 4096,            // Default buffer size
-		File:       nil,             // nil pointer
-		FilePath:   "./default.txt", // destination of temp generate
+		BufferSize: 4096,              // Default buffer size
+		File:       nil,               // nil pointer
+		FilePath:   "./default.store", // destination of temp generate
 	}
 }
 

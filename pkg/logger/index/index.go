@@ -3,7 +3,6 @@ package index
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 
@@ -36,11 +35,11 @@ type Index struct {
 	UseMemoryMapping bool
 }
 
-// Default settings for store
+// Default settings for Index
 func DefaultOptions() *Options {
 	return &Options{
-		File:             nil,             // nil pointer
-		FilePath:         "./default.txt", // destination of temp generate
+		File:             nil,               // nil pointer
+		FilePath:         "./default.index", // destination of temp generate
 		UseMemoryMapping: false,
 		AutoCreate:       true,
 		MaxIndexBytes:    1024,
@@ -100,16 +99,13 @@ func NewIndex(optFns ...IndexOptions) (*Index, error) {
 		// So we will let that be an option.
 		if opts.AutoCreate {
 			// Attempt to open or create the file only if AutoCreate is true.
-			newIndex.file, err = os.OpenFile(opts.FilePath, os.O_RDWR|os.O_CREATE, 0666)
+			newIndex.file, err = os.OpenFile(opts.FilePath, os.O_RDWR|os.O_CREATE, 0664)
 			if err != nil {
 				return nil, err
 			}
 		} else {
-			// Attempt to open the file without creating it.
-			newIndex.file, err = os.Open(opts.FilePath)
-			if err != nil {
-				return nil, err
-			}
+			// Otherwise, return err because option was not enabled
+			return nil, errors.New("you do not have auto-create enabled for indexes please use index.WithAutoCreate option to enable")
 		}
 	} else if opts.File != nil {
 		// If the file is already open, check if it's usable
@@ -135,8 +131,6 @@ func NewIndex(optFns ...IndexOptions) (*Index, error) {
 		return nil, err
 	}
 	newIndex.size = uint64(fi.Size())
-
-	fmt.Println(newIndex.file)
 
 	// Truncate new index into index file
 	if err = os.Truncate(newIndex.file.Name(), int64(opts.MaxIndexBytes)); err != nil {

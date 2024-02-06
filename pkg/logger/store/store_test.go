@@ -11,7 +11,7 @@ func TestNewStoreWithValidFileFirst(t *testing.T) {
 	expectedBufferSize := 4096
 
 	// Create a temporary file
-	tmpFile, err := os.CreateTemp("", "*.log")
+	tmpFile, err := os.CreateTemp("", "*.store")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
@@ -62,7 +62,7 @@ func TestNewStoreWithNilFileFirst(t *testing.T) {
 	//...
 
 	// Create a temporary file for testing
-	tmpFile, err := os.CreateTemp("", "*.log")
+	tmpFile, err := os.CreateTemp("", "0.store")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
@@ -81,7 +81,7 @@ func TestNewStoreWithNilFileFirst(t *testing.T) {
 
 func TestStoreAppend(t *testing.T) {
 	// Create a temporary file for testing
-	tmpfile, err := os.CreateTemp("", "store_append_test.*.log")
+	tmpfile, err := os.CreateTemp("", "store_append_test.*.store")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
@@ -117,7 +117,7 @@ func TestStoreAppend(t *testing.T) {
 
 func TestStoreRead(t *testing.T) {
 	// Create a temporary file for testing
-	tmpfile, err := os.CreateTemp("", "store_read_test.log")
+	tmpfile, err := os.CreateTemp("", "0.store")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
@@ -160,7 +160,7 @@ func TestStoreRead(t *testing.T) {
 
 func TestStoreClose(t *testing.T) {
 	// Create a temporary file path
-	tmpFile, err := os.CreateTemp("", "store_close_*.log")
+	tmpFile, err := os.CreateTemp("", "0.store")
 	if err != nil {
 		t.Fatalf("Failed to create temporary file: %v", err)
 	}
@@ -218,7 +218,7 @@ func TestStoreClose(t *testing.T) {
 
 func TestStoreInitializationWithFilePath(t *testing.T) {
 	// Create a temporary file for testing
-	tmpFile, err := os.CreateTemp("", "example_*.log")
+	tmpFile, err := os.CreateTemp("", "0.store")
 	if err != nil {
 		t.Fatalf("Failed to create temporary file: %v", err)
 	}

@@ -27,7 +27,7 @@ func TestNewIndexDefaultOptions(t *testing.T) {
 
 func TestNewIndexWithMemoryMapping(t *testing.T) {
 	// Create a temporary file for testing
-	tmpFile, err := os.CreateTemp("", "example_*.log")
+	tmpFile, err := os.CreateTemp("", "0.index")
 	if err != nil {
 		t.Fatalf("Failed to create temporary file: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestIndexReadWrite(t *testing.T) {
 	var i *Index
 
 	// Create a temporary file for testing
-	tmpFile, err := os.CreateTemp("", "example_*.log")
+	tmpFile, err := os.CreateTemp("", "0.index")
 	if err != nil {
 		t.Fatalf("Failed to create temporary file: %v", err)
 	}
@@ -131,7 +131,7 @@ func TestIndexReadWrite(t *testing.T) {
 
 func TestIndexClose(t *testing.T) {
 	// Create a temporary file for testing
-	tmpFile, err := os.CreateTemp("", "index_test")
+	tmpFile, err := os.CreateTemp("", "0.index")
 	if err != nil {
 		t.Fatalf("Failed to create temporary file: %v", err)
 	}
