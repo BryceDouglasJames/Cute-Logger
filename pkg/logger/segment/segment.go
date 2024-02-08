@@ -106,6 +106,9 @@ func NewSegment(optFns ...SegmentOptions) (*Segment, error) {
 		os.O_RDWR|os.O_CREATE,
 		0644,
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	// Initialize the index with the opened file and configuration options
 	if newSegment.index, err = index.NewIndex(
@@ -124,4 +127,16 @@ func NewSegment(optFns ...SegmentOptions) (*Segment, error) {
 
 	return newSegment, nil
 
+}
+
+func (s *Segment) Close() error {
+	if err := s.index.Close(); err != nil {
+		return err
+	}
+
+	if err := s.store.Close(); err != nil {
+		return err
+	}
+
+	return nil
 }

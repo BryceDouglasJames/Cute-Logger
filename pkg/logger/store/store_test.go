@@ -189,7 +189,7 @@ func TestStoreClose(t *testing.T) {
 	}
 	beforeInfo, err := fileBefore.Stat()
 	if err != nil {
-		t.Fatalf("Troble grabbing file info from %s: %v", tmpFilePath, err)
+		t.Fatalf("Trouble grabbing file info from %s: %v", tmpFilePath, err)
 	}
 	beforeSize := beforeInfo.Size()
 
