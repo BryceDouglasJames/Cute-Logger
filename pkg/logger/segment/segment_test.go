@@ -1,48 +1,71 @@
-package segment_test
+package segment
 
 import (
+	"io"
 	"os"
-	"path/filepath"
 	"testing"
 
-	"github.com/BryceDouglasJames/Cute-Logger/pkg/logger/segment"
+	api "github.com/BryceDouglasJames/Cute-Logger/api"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewSegment(t *testing.T) {
-	// Use the system's temporary directory for the test
-	tempDir := os.TempDir()
+	dir, err := os.MkdirTemp("", "segment-test")
+	require.NoError(t, err)
+
+	want := &api.Record{Value: []byte("test value")}
+
+	entryLength := uint64(12)
 
 	// Define options for the new segment
-	opts := []segment.SegmentOptions{
-		segment.WithFilePath(tempDir),
-		segment.WithMaxStoreBytes(1024),
-		segment.WithMaxIndexBytes(512),
-		segment.WithInitialOffset(0),
+	opts := []SegmentOptions{
+		WithFilePath(dir),
+		WithMaxStoreBytes(1024),
+		WithMaxIndexBytes(entryLength * 3),
+		WithInitialOffset(0),
 	}
 
-	// Attempt to create a new segment with the specified options
-	seg, err := segment.NewSegment(opts...)
-	if err != nil {
-		// If there is an error in creating the segment, fail the test immediately
-		t.Fatalf("Failed to create new segment: %v", err)
+	// Create a new segment with the specified options
+	seg, err := NewSegment(opts...)
+	require.NoError(t, err)
+
+	// Verify the segment is initialized with expected values
+	require.Equal(t, uint64(0), seg.nextOffset)
+
+	// Test appending and reading records from the segment
+	for i := uint64(0); i < 3; i++ {
+		offset, err := seg.Append(want)
+		require.NoError(t, err)
+		require.Equal(t, seg.baseOffset+i, offset)
+
+		got, err := seg.Read(offset)
+		require.NoError(t, err)
+		require.Equal(t, want.Value, got.Value)
 	}
 
-	// Verify that the store file has been created successfully
-	storePath := filepath.Join(tempDir, "0.store")
-	if _, err := os.Stat(storePath); os.IsNotExist(err) {
-		// If the store file does not exist, report an error.
-		t.Errorf("Store file was not created")
+	// Test the segment reaches its max capacity
+	_, err = seg.Append(want)
+	require.Equal(t, io.EOF, err)
+
+	// Adjust the configuration to test different capacities
+	dir2, err := os.MkdirTemp("", "segment-test-2")
+	require.NoError(t, err)
+
+	opts = []SegmentOptions{
+		WithFilePath(dir2),
+		WithMaxStoreBytes(uint64(len(want.Value) * 3)),
+		WithMaxIndexBytes(1024),
+		WithInitialOffset(0),
 	}
 
-	// Verify that the index file has been created successfully
-	indexPath := filepath.Join(tempDir, "0.index")
-	if _, err := os.Stat(indexPath); os.IsNotExist(err) {
-		// If the index file does not exist, report an error.
-		t.Errorf("Index file was not created")
-	}
+	// Recreate the segment with new options
+	seg, err = NewSegment(opts...)
+	require.NoError(t, err)
 
-	// Close the segment and ensure that no error occurs
-	if err := seg.Close(); err != nil {
-		t.Errorf("There was an issue closing the segment: %v", err)
-	}
+	defer os.RemoveAll(dir)
+	defer os.RemoveAll(dir2)
+	defer func() {
+		require.NoError(t, seg.Close())
+	}()
+
 }

@@ -6,8 +6,10 @@ import (
 	"os"
 	"path"
 
+	api "github.com/BryceDouglasJames/Cute-Logger/api"
 	"github.com/BryceDouglasJames/Cute-Logger/pkg/logger/index"
 	"github.com/BryceDouglasJames/Cute-Logger/pkg/logger/store"
+	"google.golang.org/protobuf/proto"
 )
 
 type Segment struct {
@@ -114,6 +116,7 @@ func NewSegment(optFns ...SegmentOptions) (*Segment, error) {
 	if newSegment.index, err = index.NewIndex(
 		index.WithFile(indexFile),
 		index.WithMaxIndexBytes(opts.MaxIndexBytes),
+		index.WithMemoryMapping(true),
 	); err != nil {
 		return nil, err
 	}
@@ -127,6 +130,62 @@ func NewSegment(optFns ...SegmentOptions) (*Segment, error) {
 
 	return newSegment, nil
 
+}
+
+func (s *Segment) Append(record *api.Record) (offset uint64, err error) {
+	// Determine the next offset for the new record based on the segment's state
+	current := s.nextOffset
+
+	// Assign the calculated offset to the record
+	record.Offset = current
+
+	// Marshal the record to a protobuf byte slice
+	p, err := proto.Marshal(record)
+	if err != nil {
+		return 0, err // Return error if marshaling fails
+	}
+
+	// Append the marshaled record to the store and retrieve the position where it was written
+	_, pos, err := s.store.Append(p)
+	if err != nil {
+		return 0, err
+	}
+
+	// Write the offset and position to the index.
+	// The offset is adjusted by the base offset of the segment.
+	if err = s.index.Write(uint32(s.nextOffset-uint64(s.baseOffset)), pos); err != nil {
+		return 0, err
+	}
+
+	// Increment the nextOffset for the next record to be appended
+	s.nextOffset++
+
+	// Return the offset of the appended record
+	return current, nil
+}
+
+func (s *Segment) Read(off uint64) (*api.Record, error) {
+	// Read from the index using the provided offset adjusted by the base offset of the segment
+	_, pos, err := s.index.Read(int64(off - s.baseOffset))
+	if err != nil {
+		return nil, err
+	}
+
+	// Read the actual data from the store using the position obtained from the index
+	p, err := s.store.Read(pos)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal the data into a Record object
+	record := &api.Record{}
+	err = proto.Unmarshal(p, record)
+	if err != nil {
+		return nil, err
+	}
+
+	// Return the unmarshaled record
+	return record, nil
 }
 
 func (s *Segment) Close() error {
