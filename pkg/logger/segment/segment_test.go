@@ -13,7 +13,10 @@ func TestNewSegment(t *testing.T) {
 	dir, err := os.MkdirTemp("", "segment-test")
 	require.NoError(t, err)
 
-	want := &api.Record{Value: []byte("test value")}
+	want := &api.Record{
+		Value:  []byte("test value"),
+		Offset: 0,
+	}
 
 	entryLength := uint64(12)
 
@@ -62,10 +65,57 @@ func TestNewSegment(t *testing.T) {
 	seg, err = NewSegment(opts...)
 	require.NoError(t, err)
 
-	defer os.RemoveAll(dir)
-	defer os.RemoveAll(dir2)
+	defer func() {
+		os.RemoveAll(dir)
+	}()
+
+	defer func() {
+		os.RemoveAll(dir2)
+	}()
+
 	defer func() {
 		require.NoError(t, seg.Close())
 	}()
 
+}
+
+func TestSegmentIsFull(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "segment-isfull-test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	// Setup segment with small capacities to quickly reach full status during testing
+	seg, err := NewSegment(
+		WithFilePath(tempDir),
+		WithMaxStoreBytes(50),
+		WithMaxIndexBytes(50),
+		WithInitialOffset(0),
+	)
+	require.NoError(t, err)
+
+	defer func() {
+		require.NoError(t, seg.Close())
+	}()
+
+	testRecord := &api.Record{
+		Value:  []byte("test"),
+		Offset: 0,
+	}
+
+	// Append records until the segment is close to full
+	for !seg.IsFull() {
+		_, err := seg.Append(testRecord)
+		if err != nil {
+			t.Fatalf("Failed to append record to segment: %v", err)
+		}
+	}
+
+	// Confirm the segment reports it is full
+	require.True(t, seg.IsFull(), "Segment should report it is full")
+
+	// Attempt to append another record and expect failure or specific behavior indicating the segment is full
+	_, err = seg.Append(testRecord)
+	if err == nil {
+		t.Error("Expected error when appending to a full segment")
+	}
 }

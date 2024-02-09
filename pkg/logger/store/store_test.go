@@ -29,8 +29,8 @@ func TestNewStoreWithValidFileFirst(t *testing.T) {
 	}
 
 	// Check if the buffer size is set as expected
-	if !reflect.DeepEqual(store.buf.Size(), expectedBufferSize) {
-		t.Errorf("Expected buffer size to be %d, got %d", expectedBufferSize, store.buf.Size())
+	if !reflect.DeepEqual(store.Buf.Size(), expectedBufferSize) {
+		t.Errorf("Expected buffer size to be %d, got %d", expectedBufferSize, store.Buf.Size())
 	}
 
 	// Validate the file association
@@ -39,8 +39,8 @@ func TestNewStoreWithValidFileFirst(t *testing.T) {
 	}
 
 	// Check the initial size of the store
-	if store.size != 0 {
-		t.Errorf("Expected initial store size to be 0, got %d", store.size)
+	if store.Size != 0 {
+		t.Errorf("Expected initial store size to be 0, got %d", store.Size)
 	}
 }
 

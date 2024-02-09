@@ -32,9 +32,9 @@ type Options struct {
 type StoreOptions func(*Options)
 
 type Store struct {
-	mu   sync.Mutex
-	buf  *bufio.Writer
-	size uint64
+	Mutex sync.Mutex
+	Buf   *bufio.Writer
+	Size  uint64
 
 	*os.File // File pointer to write logs to; if nil, the store will not be associated with a file initially
 }
@@ -109,42 +109,42 @@ func NewStore(optFns ...StoreOptions) (filestore *Store, err error) {
 
 	// Return a new Store instance
 	return &Store{
-		File: file,
-		buf:  buf,
-		mu:   sync.Mutex{},
-		size: 0, // Initial store size is 0.
+		File:  file,
+		Buf:   buf,
+		Mutex: sync.Mutex{},
+		Size:  0, // Initial store size is 0.
 	}, nil
 
 }
 
 func (store *Store) Append(entry []byte) (size uint64, pos uint64, err error) {
 	// Lock the store to prevent concurrent writes
-	store.mu.Lock()
-	defer store.mu.Unlock()
+	store.Mutex.Lock()
+	defer store.Mutex.Unlock()
 
 	// Position holds the current size of the store,
 	// which is also the position where new data will be appended.
-	position := store.size
+	position := store.Size
 
 	// Write the length of the page first as a prefix
 	// This length prefix allows for knowing how much to read during retrieval
-	if err := binary.Write(store.buf, enc, uint64(len(entry))); err != nil {
+	if err := binary.Write(store.Buf, enc, uint64(len(entry))); err != nil {
 		return 0, 0, err
 	}
 
 	// Write the contents of the page to the store
-	written, err := store.buf.Write(entry)
+	written, err := store.Buf.Write(entry)
 	if err != nil {
 		return 0, 0, err
 	}
 
 	// Calculate the total number of bytes written (data + length prefix)
 	totalWritten := uint64(written + wordLength)
-	store.size += totalWritten
+	store.Size += totalWritten
 
 	// Flush the buffer to ensure all data is written to the underlying writer
 	// Flushing is important to maintain data integrity
-	if err := store.buf.Flush(); err != nil {
+	if err := store.Buf.Flush(); err != nil {
 		return 0, 0, err
 	}
 
@@ -153,8 +153,8 @@ func (store *Store) Append(entry []byte) (size uint64, pos uint64, err error) {
 
 func (store *Store) Read(pos uint64) ([]byte, error) {
 	// Lock the store to prevent concurrent reads
-	store.mu.Lock()
-	defer store.mu.Unlock()
+	store.Mutex.Lock()
+	defer store.Mutex.Unlock()
 
 	// Even if the client gave the option to not have a file initially,
 	// there still must be a file to read from they they have designated
@@ -195,15 +195,15 @@ func (store *Store) Read(pos uint64) ([]byte, error) {
 
 func (store *Store) Close() error {
 	// Lock the store to prevent any more actions
-	store.mu.Lock()
-	defer store.mu.Unlock()
+	store.Mutex.Lock()
+	defer store.Mutex.Unlock()
 
 	// First, flush any data in the buffer to ensure all
 	// written data is saved to the file.
-	if err := store.buf.Flush(); err != nil {
+	if err := store.Buf.Flush(); err != nil {
 		return err
 	}
-	store.buf = nil
+	store.Buf = nil
 
 	// Close the file after flushing the buffer
 	//This ensures that all buffered data is safely written to the file

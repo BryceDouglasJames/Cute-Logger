@@ -29,9 +29,9 @@ type Options struct {
 type IndexOptions func(*Options)
 
 type Index struct {
-	file             *os.File
-	size             uint64
-	mmap             gommap.MMap
+	File             *os.File
+	Size             uint64
+	MemoryMap        gommap.MMap
 	UseMemoryMapping bool
 }
 
@@ -99,7 +99,7 @@ func NewIndex(optFns ...IndexOptions) (*Index, error) {
 		// So we will let that be an option.
 		if opts.AutoCreate {
 			// Attempt to open or create the file only if AutoCreate is true.
-			newIndex.file, err = os.OpenFile(opts.FilePath, os.O_RDWR|os.O_CREATE, 0664)
+			newIndex.File, err = os.OpenFile(opts.FilePath, os.O_RDWR|os.O_CREATE, 0664)
 			if err != nil {
 				return nil, err
 			}
@@ -118,7 +118,7 @@ func NewIndex(optFns ...IndexOptions) (*Index, error) {
 			return nil, err
 		}
 
-		newIndex.file = opts.File
+		newIndex.File = opts.File
 		opts.FilePath = opts.File.Name()
 	} else {
 		// No file or file path provided
@@ -126,14 +126,14 @@ func NewIndex(optFns ...IndexOptions) (*Index, error) {
 	}
 
 	// Get file info to set the size
-	fi, err := newIndex.file.Stat()
+	fi, err := newIndex.File.Stat()
 	if err != nil {
 		return nil, err
 	}
-	newIndex.size = uint64(fi.Size())
+	newIndex.Size = uint64(fi.Size())
 
 	// Truncate new index into index file
-	if err = os.Truncate(newIndex.file.Name(), int64(opts.MaxIndexBytes)); err != nil {
+	if err = os.Truncate(newIndex.File.Name(), int64(opts.MaxIndexBytes)); err != nil {
 		return nil, err
 	}
 
@@ -146,12 +146,12 @@ func NewIndex(optFns ...IndexOptions) (*Index, error) {
 		mmapProt := gommap.PROT_READ | gommap.PROT_WRITE
 		mmapFlags := gommap.MAP_SHARED | gommap.MAP_ANONYMOUS
 
-		newMap, err := gommap.Map(newIndex.file.Fd(), mmapProt, mmapFlags)
+		newMap, err := gommap.Map(newIndex.File.Fd(), mmapProt, mmapFlags)
 		if err != nil {
 			return nil, err
 		}
 		newIndex.UseMemoryMapping = true
-		newIndex.mmap = newMap
+		newIndex.MemoryMap = newMap
 	}
 
 	return newIndex, nil
@@ -159,31 +159,31 @@ func NewIndex(optFns ...IndexOptions) (*Index, error) {
 
 func (i *Index) Write(off uint32, pos uint64) error {
 	// Check if there's enough space left in the memory-mapped file to write a new entry
-	if uint64(len(i.mmap)) < i.size+entryLength {
+	if uint64(len(i.MemoryMap)) < i.Size+entryLength {
 		return io.EOF
 	}
 
 	// Write the offset value to the memory-mapped file at the current size position
-	enc.PutUint32(i.mmap[i.size:i.size+offset], off)
+	enc.PutUint32(i.MemoryMap[i.Size:i.Size+offset], off)
 
 	// Write the position value immediately after offset in the memory-mapped file
-	enc.PutUint64(i.mmap[i.size+offset:i.size+entryLength], pos)
+	enc.PutUint64(i.MemoryMap[i.Size+offset:i.Size+entryLength], pos)
 
 	// Increase size counter for index
-	i.size += uint64(entryLength)
+	i.Size += uint64(entryLength)
 
 	return nil
 }
 
 func (i *Index) Read(in int64) (out uint32, pos uint64, err error) {
 	// If the index size is 0, return EOF to indicate no entries can be read
-	if i.size == 0 {
+	if i.Size == 0 {
 		return 0, 0, io.EOF
 	}
 
 	// If in is -1, calculate the index of the last entry. Otherwise, use in as the index
 	if in == -1 {
-		out = uint32((i.size / entryLength) - 1)
+		out = uint32((i.Size / entryLength) - 1)
 	} else {
 		out = uint32(in)
 	}
@@ -192,39 +192,39 @@ func (i *Index) Read(in int64) (out uint32, pos uint64, err error) {
 	pos = uint64(out) * entryLength
 
 	// If the calculated position is beyond the size of the index, return EOF
-	if i.size < pos+entryLength {
+	if i.Size < pos+entryLength {
 		return 0, 0, io.EOF
 	}
 
 	// Read the entry value and position from the memory-mapped file
-	out = enc.Uint32(i.mmap[pos : pos+offset])
-	pos = enc.Uint64(i.mmap[pos+offset : pos+entryLength])
+	out = enc.Uint32(i.MemoryMap[pos : pos+offset])
+	pos = enc.Uint64(i.MemoryMap[pos+offset : pos+entryLength])
 
 	return out, pos, nil
 }
 
 func (i *Index) Close() error {
 	// Check if mmap exists and is valid before attempting to sync
-	if i.mmap != nil {
-		if err := i.mmap.Sync(gommap.MS_SYNC); err != nil {
+	if i.MemoryMap != nil {
+		if err := i.MemoryMap.Sync(gommap.MS_SYNC); err != nil {
 			return err
 		}
-	} else if len(i.mmap) == 0 {
-		i.mmap = nil
+	} else if len(i.MemoryMap) == 0 {
+		i.MemoryMap = nil
 	} else if i.UseMemoryMapping {
 		return errors.New("something is very wrong index mmap should not be nil")
 	}
 
 	// Ensure file is synced and truncated properly
-	if err := i.file.Sync(); err != nil {
+	if err := i.File.Sync(); err != nil {
 		return err
 	}
-	if err := i.file.Truncate(int64(i.size)); err != nil {
+	if err := i.File.Truncate(int64(i.Size)); err != nil {
 		return err
 	}
 
 	// Close the file at the end
-	if err := i.file.Close(); err != nil {
+	if err := i.File.Close(); err != nil {
 		return err
 	}
 

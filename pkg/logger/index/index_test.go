@@ -14,9 +14,9 @@ func TestNewIndexDefaultOptions(t *testing.T) {
 	}
 
 	// Cleanup
-	defer os.Remove(idx.file.Name())
+	defer os.Remove(idx.File.Name())
 
-	if idx.file == nil {
+	if idx.File == nil {
 		t.Error("Expected default file to be set, got nil")
 	}
 

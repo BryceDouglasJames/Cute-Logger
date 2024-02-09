@@ -199,3 +199,8 @@ func (s *Segment) Close() error {
 
 	return nil
 }
+
+func (s *Segment) IsFull() bool {
+	// Check to see if segement is at max capacity
+	return s.store.Size >= s.config.MaxStoreBytes || s.index.Size >= s.config.MaxIndexBytes
+}
