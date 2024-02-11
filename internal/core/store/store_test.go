@@ -113,6 +113,8 @@ func TestStoreAppend(t *testing.T) {
 	if !reflect.DeepEqual(written, uint64(len(testPage)+wordLength)) {
 		t.Errorf("Expected %d bytes written, got %d", len(testPage)+wordLength, written)
 	}
+
+	defer os.Remove("default.store")
 }
 
 func TestStoreRead(t *testing.T) {

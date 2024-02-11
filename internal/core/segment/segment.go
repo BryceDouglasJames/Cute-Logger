@@ -7,8 +7,8 @@ import (
 	"path"
 
 	api "github.com/BryceDouglasJames/Cute-Logger/api"
-	"github.com/BryceDouglasJames/Cute-Logger/pkg/logger/index"
-	"github.com/BryceDouglasJames/Cute-Logger/pkg/logger/store"
+	"github.com/BryceDouglasJames/Cute-Logger/internal/core/index"
+	"github.com/BryceDouglasJames/Cute-Logger/internal/core/store"
 	"google.golang.org/protobuf/proto"
 )
 
