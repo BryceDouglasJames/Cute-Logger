@@ -204,3 +204,7 @@ func (s *Segment) IsFull() bool {
 	// Check to see if segement is at max capacity
 	return s.store.Size >= s.config.MaxStoreBytes || s.index.Size >= s.config.MaxIndexBytes
 }
+
+func (s *Segment) BaseOffset() uint64 {
+	return s.baseOffset
+}
