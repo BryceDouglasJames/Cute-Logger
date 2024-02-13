@@ -32,8 +32,8 @@ type Options struct {
 func DefaultOptions() *Options {
 	return &Options{
 		FilePath:      "./default.txt", // destination of temp generate
-		MaxIndexBytes: 50 * 1024 * 1024,
-		MaxStoreBytes: 10 * 1024 * 1024, // 10 MB
+		MaxIndexBytes: 1024,
+		MaxStoreBytes: 1024,
 	}
 }
 

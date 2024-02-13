@@ -6,11 +6,14 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
+	api "github.com/BryceDouglasJames/Cute-Logger/api"
 	seg "github.com/BryceDouglasJames/Cute-Logger/internal/core/segment"
 )
 
 type Log struct {
+	mutex     sync.RWMutex
 	Directory string
 
 	activeSegment *seg.Segment
@@ -60,6 +63,25 @@ func (l *Log) setup() error {
 		}
 	}
 	return nil
+}
+
+func (l *Log) Append(record *api.Record) (offset uint64, err error) {
+	// Protect Read/Write
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	// Append record to active segment
+	off, err := l.activeSegment.Append(record)
+	if err != nil {
+		return 0, err
+	}
+
+	// If the active segment is now full, create a new one.
+	if l.activeSegment.IsFull() {
+		err = l.newSegment(off + 1)
+	}
+
+	return off, err
 }
 
 func (l *Log) newSegment(offset uint64) error {
