@@ -51,11 +51,9 @@ func TestNewLogAndNewSegment(t *testing.T) {
 	require.Equal(t, log.activeSegment, log.segmentList[len(log.segmentList)-1], "Active segment should be the last segment in the list")
 }
 
-/********* TODO: Fix this test and make sure we can read back results *********
-
- func TestNewLogAppend(t *testing.T) {
+func TestNewLogAppend(t *testing.T) {
 	// Create a temporary directory for testing
-	tempDir, err := os.MkdirTemp("", "log_test_dir")
+	tempDir, err := os.MkdirTemp("", "log_test_again")
 	require.NoError(t, err)
 	defer os.RemoveAll(tempDir)
 
@@ -79,23 +77,27 @@ func TestNewLogAndNewSegment(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint64(0), off)
 
+	// Verify the record is correctly appended to the active segment
+	readBack, err := log.activeSegment.Read(off)
+	require.NoError(t, err)
+	require.Equal(t, record.Value, readBack.Value, "The read-back record should match the appended record")
+
 	// Verify the active segment switches when full
 	// Simulate appending records until the current active segment is full
-	for !log.activeSegment.IsFull() {
+	for !log.segmentList[0].IsFull() {
 		_, err := log.Append(record)
 		require.NoError(t, err)
 	}
 
 	// Append another record to trigger a new segment creation
 	_, err = log.Append(record)
-	require.Error(t, err)
+	require.NoError(t, err)
 
 	// Verify a new segment was created and set as active
 	require.NotEqual(t, prevActiveSegment, log.activeSegment, "A new segment should be active after the previous one is full")
 	require.True(t, len(log.segmentList) > 1, "There should be more than one segment in the list after filling the first one")
 
 }
-*/
 
 func TestLogRead(t *testing.T) {
 	// Create a temporary directory for testing
