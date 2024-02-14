@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"errors"
 	"os"
 	"path"
 	"sort"
@@ -82,6 +83,31 @@ func (l *Log) Append(record *api.Record) (offset uint64, err error) {
 	}
 
 	return off, err
+}
+
+func (l *Log) Read(offset uint64) (*api.Record, error) {
+	l.mutex.RLock()
+	defer l.mutex.RUnlock()
+
+	// Declare a pointer to hold the segment containing the offset
+	var s *seg.Segment
+
+	// Iterate through all segments to find the one containing the offset
+	for _, segment := range l.segmentList {
+
+		// Check if the current segment's range includes the offset
+		if segment.BaseOffset() <= offset && offset < segment.NextOffset() {
+			s = segment
+			break
+		}
+	}
+
+	// Check if segment is found or the found segment's next offset is not greater than the given offset
+	if s == nil || s.NextOffset() <= offset {
+		return nil, errors.New("offset is out of range when reading segments")
+	}
+
+	return s.Read(offset) // Read and return the record from the found segment
 }
 
 func (l *Log) newSegment(offset uint64) error {

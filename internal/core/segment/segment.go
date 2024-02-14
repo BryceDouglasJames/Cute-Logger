@@ -208,3 +208,7 @@ func (s *Segment) IsFull() bool {
 func (s *Segment) BaseOffset() uint64 {
 	return s.baseOffset
 }
+
+func (s *Segment) NextOffset() uint64 {
+	return s.nextOffset
+}
