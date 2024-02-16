@@ -121,3 +121,55 @@ func TestLogRead(t *testing.T) {
 	// Verify that the read record matches the initial record
 	require.Equal(t, initialRecord.Value, readRecord.Value, "The read record should match the initial record")
 }
+
+func TestLogClose(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir, err := os.MkdirTemp("", "log_test_dir")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	// Create a new log instance with the temporary directory
+	log, err := NewLog(tempDir)
+	require.NoError(t, err)
+
+	// Attempt to close without errors
+	require.NoError(t, log.Close(), "closing log should not produce an error")
+}
+
+func TestLogDelete(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir, err := os.MkdirTemp("", "log_test_dir")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	// Create a new log instance with the temporary directory
+	log, err := NewLog(tempDir)
+	require.NoError(t, err)
+
+	// Attempt to delete logger and make sure directory no longer exists
+	require.NoError(t, log.Delete(), "deleting log should not produce an error")
+	_, err = os.Stat(tempDir)
+	require.True(t, os.IsNotExist(err), "log directory should be removed after delete")
+}
+
+func TestLogReset(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir, err := os.MkdirTemp("", "log_test_dir")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	// Create a new log instance with the temporary directory
+	log, err := NewLog(tempDir)
+	require.NoError(t, err)
+
+	// Simulate adding data to the log
+	dummyRecord := &api.Record{Value: []byte("test")}
+	_, err = log.Append(dummyRecord)
+	require.NoError(t, err)
+
+	// Reset the logger
+	require.NoError(t, log.Reset(), "resetting log should not produce an error")
+
+	// Check the segment list contains only one segment.
+	require.Len(t, log.segmentList, 1, "Expected exactly one segment after reset")
+}

@@ -2,6 +2,7 @@ package logger
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path"
 	"sort"
@@ -25,44 +26,50 @@ func NewLog(dir string) (log *Log, err error) {
 	l := &Log{
 		Directory: dir,
 	}
-
+	fmt.Println("HELLOOOOOO")
 	return l, l.setup()
 }
 
 func (l *Log) setup() error {
+	// Attempt to read the directory for any existing log files
 	logFiles, err := os.ReadDir(l.Directory)
 	if err != nil {
 		return err
 	}
 
+	// Parse the starting offsets from the filenames of log files
 	var startingOffsets []uint64
 	for _, file := range logFiles {
 		offsetString := strings.TrimSuffix(file.Name(), path.Ext(file.Name()))
-
 		offset, _ := strconv.ParseUint(offsetString, 10, 0)
+		if err != nil {
+			return errors.New("failed to parse offset")
+		}
 		startingOffsets = append(startingOffsets, offset)
 	}
 
+	// Sort the offsets to ensure segments are processed in order.
 	sort.Slice(startingOffsets,
 		func(i, j int) bool {
 			return startingOffsets[i] < startingOffsets[j]
 		},
 	)
 
-	for i := 0; i < len(startingOffsets); i++ {
+	// Create segments for each starting offset.
+	// Skip every other offset since they are duplicated for index and store.
+	for i := 0; i < len(startingOffsets); i += 2 {
 		if err = l.newSegment(startingOffsets[i]); err != nil {
 			return err
 		}
-
-		//startingOffset contains dup for index and store so we skip the dup
-		i++
 	}
 
-	if l.segmentList == nil {
-		if err = l.newSegment(0); err != nil {
+	// If no segments were found, initialize a new segment at offset 0
+	if len(l.segmentList) == 0 {
+		if err := l.newSegment(0); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -108,6 +115,49 @@ func (l *Log) Read(offset uint64) (*api.Record, error) {
 	}
 
 	return s.Read(offset) // Read and return the record from the found segment
+}
+
+func (l *Log) Close() error {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	// Iterate through all segments and attempt to close them.
+	for _, seg := range l.segmentList {
+		if err := seg.Close(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (l *Log) Delete() error {
+	// Close all segments to ensure that all resources are released.
+	if err := l.Close(); err != nil {
+		return errors.New("failed to close segments")
+	}
+
+	// Remove the log directory along with all its contents.
+	if err := os.RemoveAll(l.Directory); err != nil {
+		return errors.New("failed to remove log directory")
+	}
+
+	return nil
+}
+
+func (l *Log) Reset() error {
+	// Delete the current log data, including all files and directories
+	if err := l.Delete(); err != nil {
+		return err
+	}
+
+	// Ensure the log directory is recreated after deletion
+	if err := os.MkdirAll(l.Directory, 0755); err != nil {
+		return errors.New("failed to recreate log directory")
+	}
+
+	// Reinitialize the log to its initial state
+	return l.setup()
 }
 
 func (l *Log) newSegment(offset uint64) error {
