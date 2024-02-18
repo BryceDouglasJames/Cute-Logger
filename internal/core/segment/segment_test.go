@@ -119,3 +119,35 @@ func TestSegmentIsFull(t *testing.T) {
 		t.Error("Expected error when appending to a full segment")
 	}
 }
+
+func TestSegmentRemove(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "segment_remove_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	// Create a new segment for testing
+	segment, err := NewSegment(
+		WithFilePath(tempDir),
+		WithInitialOffset(0),
+	)
+	require.NoError(t, err)
+
+	// Ensure the segment's files exist before attempting removal
+	_, err = os.Stat(segment.index.File.Name())
+	require.NoError(t, err, "Index file should exist before removal")
+	_, err = os.Stat(segment.store.Name())
+	require.NoError(t, err, "Store file should exist before removal")
+
+	// Attempt to remove the segment
+	err = segment.Remove()
+	require.NoError(t, err, "Segment removal should not produce an error")
+
+	// Verify that the segment's files have been removed
+	_, err = os.Stat(segment.index.File.Name())
+	require.Error(t, err, "Index file should not exist after removal")
+	require.True(t, os.IsNotExist(err), "Error should indicate that the index file does not exist")
+
+	_, err = os.Stat(segment.store.Name())
+	require.Error(t, err, "Store file should not exist after removal")
+	require.True(t, os.IsNotExist(err), "Error should indicate that the store file does not exist")
+}

@@ -129,7 +129,6 @@ func NewSegment(optFns ...SegmentOptions) (*Segment, error) {
 	}
 
 	return newSegment, nil
-
 }
 
 func (s *Segment) Append(record *api.Record) (offset uint64, err error) {
@@ -197,6 +196,26 @@ func (s *Segment) Close() error {
 		return err
 	}
 
+	return nil
+}
+
+func (s *Segment) Remove() error {
+	// Close the segment first to ensure data integrity and resource release
+	if err := s.Close(); err != nil {
+		return err
+	}
+
+	// Attempt to remove the index file
+	if err := os.Remove(s.index.File.Name()); err != nil {
+		return err
+	}
+
+	// Attempt to remove the store file
+	if err := os.Remove(s.store.Name()); err != nil {
+		return err
+	}
+
+	// Return nil to indicate successful removal
 	return nil
 }
 
