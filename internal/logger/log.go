@@ -2,7 +2,6 @@ package logger
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path"
 	"sort"
@@ -26,7 +25,7 @@ func NewLog(dir string) (log *Log, err error) {
 	l := &Log{
 		Directory: dir,
 	}
-	fmt.Println("HELLOOOOOO")
+
 	return l, l.setup()
 }
 
@@ -115,6 +114,37 @@ func (l *Log) Read(offset uint64) (*api.Record, error) {
 	}
 
 	return s.Read(offset) // Read and return the record from the found segment
+}
+
+func (l *Log) Truncate(lowest uint64) error {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	// Prepare a slice to hold segments that are not removed
+	var retainedSegments []*seg.Segment
+
+	// Iterate over all segments in the log
+	for _, s := range l.segmentList {
+
+		// Check if the segment's next offset is before the truncation threshold
+		if s.NextOffset() <= lowest+1 {
+
+			// If so, attempt to remove the segment from the filesystem
+			if err := s.Remove(); err != nil {
+				return err
+			}
+
+			// Skip appending this segment to the retained segments
+			continue
+		}
+		// If the segment is beyond the truncation threshold, retain it
+		retainedSegments = append(retainedSegments, s)
+	}
+
+	// Update the log's segments to only include those that have been retained
+	l.segmentList = retainedSegments
+
+	return nil
 }
 
 func (l *Log) Close() error {

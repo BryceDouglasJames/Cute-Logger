@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -172,4 +173,31 @@ func TestLogReset(t *testing.T) {
 
 	// Check the segment list contains only one segment.
 	require.Len(t, log.segmentList, 1, "Expected exactly one segment after reset")
+}
+
+func TestLogTruncate(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir, err := os.MkdirTemp("", "log_truncate_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	// Initialize the log with the temporary directory
+	log, err := NewLog(tempDir)
+	require.NoError(t, err)
+
+	// Append some records to generate segments
+	for i := 0; i < 5; i++ {
+		_, err := log.Append(&api.Record{Value: []byte(fmt.Sprintf("record %d", i))})
+		require.NoError(t, err)
+	}
+
+	// Simulate truncating the log to remove early segments
+	err = log.Truncate(2)
+	require.NoError(t, err)
+
+	// Verify that segments with nextOffset <= 3 are removed
+	for _, s := range log.segmentList {
+		require.True(t, s.NextOffset() > 3, "Segment with nextOffset <= 3 should have been truncated")
+	}
+
 }
