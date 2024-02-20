@@ -2,6 +2,7 @@ package logger
 
 import (
 	"errors"
+	"io"
 	"os"
 	"path"
 	"sort"
@@ -11,6 +12,7 @@ import (
 
 	api "github.com/BryceDouglasJames/Cute-Logger/api"
 	seg "github.com/BryceDouglasJames/Cute-Logger/internal/core/segment"
+	"github.com/BryceDouglasJames/Cute-Logger/internal/core/store"
 )
 
 type Log struct {
@@ -19,6 +21,11 @@ type Log struct {
 
 	activeSegment *seg.Segment
 	segmentList   []*seg.Segment
+}
+
+type originSegmentReader struct {
+	storePointer *store.Store
+	offset       int64
 }
 
 func NewLog(dir string) (log *Log, err error) {
@@ -114,6 +121,31 @@ func (l *Log) Read(offset uint64) (*api.Record, error) {
 	}
 
 	return s.Read(offset) // Read and return the record from the found segment
+}
+
+func (l *Log) Reader() io.Reader {
+	l.mutex.RLock()
+	defer l.mutex.RUnlock()
+	readers := make([]io.Reader, len(l.segmentList))
+	for i, s := range l.segmentList {
+		readers[i] = &originSegmentReader{
+			storePointer: s.GetStore(),
+			offset:       0,
+		}
+	}
+
+	return io.MultiReader(readers...)
+}
+
+func (o *originSegmentReader) Read(p []byte) (int, error) {
+	// Read from segment from the origin reader offset
+	n, err := o.storePointer.ReadAt(p, o.offset)
+
+	// Increment the offset by the number of bytes read to maintain the current position
+	o.offset += int64(n)
+
+	// Return the number of bytes read and any error encountered
+	return n, err
 }
 
 func (l *Log) Truncate(lowest uint64) error {

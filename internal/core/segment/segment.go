@@ -231,3 +231,7 @@ func (s *Segment) BaseOffset() uint64 {
 func (s *Segment) NextOffset() uint64 {
 	return s.nextOffset
 }
+
+func (s *Segment) GetStore() *store.Store {
+	return s.store
+}

@@ -2,6 +2,7 @@ package logger
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -9,6 +10,7 @@ import (
 
 	api "github.com/BryceDouglasJames/Cute-Logger/api"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestNewLogAndNewSegment(t *testing.T) {
@@ -200,4 +202,42 @@ func TestLogTruncate(t *testing.T) {
 		require.True(t, s.NextOffset() > 3, "Segment with nextOffset <= 3 should have been truncated")
 	}
 
+}
+
+func TestLogReader(t *testing.T) {
+	// Create a temporary directory for the log
+	tempDir, err := os.MkdirTemp("", "log_test_reader")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	// Create a new log instance.
+	log, err := NewLog(tempDir)
+	require.NoError(t, err)
+
+	// Create a record to append to the log
+	append := &api.Record{
+		Value: []byte("hello world"),
+	}
+
+	// Append the record to the log
+	off, err := log.Append(append)
+	require.NoError(t, err)
+	require.Equal(t, uint64(0), off)
+
+	// Use the log's Reader to read back the data
+	reader := log.Reader()
+	b, err := io.ReadAll(reader)
+	require.NoError(t, err)
+
+	// Prefix length of each entry. Rule is set by index and store wordLength.
+	var wordLength uint64 = 8
+	read := &api.Record{}
+	err = proto.Unmarshal(b[wordLength:], read)
+
+	// Unmarshal the data read from the log back into a record
+	require.NoError(t, err)
+	require.Equal(t, append.Value, read.Value)
+
+	// Verify the original and read records are equal
+	require.Equal(t, append.Value, read.Value, "Read value should match the original appended value.")
 }
