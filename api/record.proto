@@ -8,3 +8,38 @@ message Record {
   bytes value = 1;
   uint64 offset = 2;
 }
+
+// Define a message to encapsulate a request to produce (append) a record to the log.
+message ProduceRequest {
+  // The record to be appended to the log.
+  Record record = 1;
+}
+
+// Define a message to encapsulate the response for a produce request.
+message ProduceResponse {
+  // The offset where the record was appended in the log.
+  uint64 offset = 1;
+}
+
+// Define a message to encapsulate a request to consume (read) a record from the log.
+message ConsumeRequest {
+  // The offset from which to start reading the log.
+  uint64 offset = 1;
+}
+
+// Define a message to encapsulate the response for a consume request.
+message ConsumeResponse {
+  // The record that was read from the log.
+  Record record = 2;
+}
+
+// Define a service that provides log operations.
+service Log {
+  // Define a procedure call for producing (appending) a record to the log.
+  // Takes a ProduceRequest and returns a ProduceResponse.
+  rpc Produce(ProduceRequest) returns (ProduceResponse) {}
+
+  // Define a procedure call for consuming (reading) a record from the log.
+  // Takes a ConsumeRequest and returns a ConsumeResponse.
+  rpc Consume(ConsumeRequest) returns (ConsumeResponse) {}
+}
