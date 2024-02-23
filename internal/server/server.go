@@ -1,8 +1,8 @@
 package server
 
 import (
+	"context"
 	"errors"
-	"fmt"
 
 	api "github.com/BryceDouglasJames/Cute-Logger/api"
 )
@@ -68,10 +68,39 @@ func NewGRPCServer(opts ...Option) (*grpcServer, error) {
 	for _, opt := range opts {
 		err := opt(srv)
 		if err != nil {
-			fmt.Println("YOO")
 			return nil, err
 		}
 	}
 
 	return srv, nil
+}
+
+// Produce handles the gRPC call for producing (appending) a record to the commit log
+func (s *grpcServer) Produce(ctx context.Context, req *api.ProduceRequest) (*api.ProduceResponse, error) {
+
+	// Append the record contained in the request to the commit log
+	offset, err := s.CommitLog.Append(req.Record)
+
+	// If there's an error appending the record, return the error immediately
+	if err != nil {
+		return nil, err
+	}
+
+	// If the append is successful, return a ProduceResponse with the offset of the appended record
+	return &api.ProduceResponse{Offset: offset}, nil
+}
+
+// Consume handles the gRPC call for consuming (reading) a record from the commit log
+func (s *grpcServer) Consume(ctx context.Context, req *api.ConsumeRequest) (*api.ConsumeResponse, error) {
+
+	// Read the record from the commit log at the specified offset in the request
+	record, err := s.CommitLog.Read(req.Offset)
+
+	// If there's an error reading the record, return the error immediately
+	if err != nil {
+		return nil, err
+	}
+
+	// If the read is successful, return a ConsumeResponse with the read record
+	return &api.ConsumeResponse{Record: record}, nil
 }
