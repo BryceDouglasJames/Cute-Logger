@@ -42,4 +42,9 @@ service Log {
   // Define a procedure call for consuming (reading) a record from the log.
   // Takes a ConsumeRequest and returns a ConsumeResponse.
   rpc Consume(ConsumeRequest) returns (ConsumeResponse) {}
+
+  // Initiates a server-side streaming RPC for producing messages to the log.
+  // Clients send a stream of ProduceRequest messages and receive a stream of ProduceResponse messages,
+  // allowing for efficient, bidirectional communication.
+  rpc ProduceStream(stream ProduceRequest) returns (stream ProduceResponse) {}
 }

@@ -3,8 +3,12 @@ package server
 import (
 	"context"
 	"errors"
+	"io"
+	"log"
 
 	api "github.com/BryceDouglasJames/Cute-Logger/api"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // CommitLog defines the interface for a commit log system.
@@ -88,6 +92,41 @@ func (s *grpcServer) Produce(ctx context.Context, req *api.ProduceRequest) (*api
 
 	// If the append is successful, return a ProduceResponse with the offset of the appended record
 	return &api.ProduceResponse{Offset: offset}, nil
+}
+
+func (s *grpcServer) ProduceStream(stream api.Log_ProduceStreamServer) error {
+	for {
+
+		// Attempt to receive a message from the stream
+		req, err := stream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				log.Println("Stream closed by client")
+				return nil
+			}
+			log.Printf("Error receiving from stream: %v\n", err)
+			return status.Errorf(codes.Unknown, "Error receiving from stream: %v", err)
+		}
+
+		// Log the received request for debugging purposes
+		log.Printf("Received request: %v\n", req)
+
+		// Call the Produce method to process the received request
+		res, err := s.Produce(stream.Context(), req)
+		if err != nil {
+			log.Printf("Error producing message: %v\n", err)
+			return status.Errorf(codes.Internal, "Error producing message: %v", err)
+		}
+
+		// Attempt to send the response back to the client
+		if err = stream.Send(res); err != nil {
+			log.Printf("Error sending to stream: %v\n", err)
+			return status.Errorf(codes.Unknown, "Error sending to stream: %v", err)
+		}
+
+		// Log the sent response for debugging purposes
+		log.Printf("Sent response: %v\n", res)
+	}
 }
 
 // Consume handles the gRPC call for consuming (reading) a record from the commit log
