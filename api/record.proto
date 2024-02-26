@@ -47,4 +47,10 @@ service Log {
   // Clients send a stream of ProduceRequest messages and receive a stream of ProduceResponse messages,
   // allowing for efficient, bidirectional communication.
   rpc ProduceStream(stream ProduceRequest) returns (stream ProduceResponse) {}
+
+  // ConsumeStream streams log entries to a client, starting from a specified offset.
+  // Clients call this method to subscribe to log entries being appended to the log.
+  // The stream continues sending log entries to the client until the stream is closed
+  // by the client or an error occurs.
+  rpc ConsumeStream(ConsumeRequest) returns (stream ConsumeResponse) {}
 }

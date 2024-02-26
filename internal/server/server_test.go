@@ -100,9 +100,34 @@ func TestProduceStream(t *testing.T) {
 	)
 
 	// Call the ProduceStream method with the mocked stream and check for errors
-	// err = s.ProduceStream(mockStream)
-	// if err != nil {
-	//	t.Fatalf("ProduceStream failed: %v", err)
-	// }
+	err = s.ProduceStream(mockStream)
+	if err != nil {
+		t.Fatalf("ProduceStream failed: %v", err)
+	}
 }
+
+func testProduceConsume(t *testing.T, client api.LogClient, config *Config) {
+	// Establish a background context for the test
+	ctx := context.Background()
+
+	// Define the record we want to produce to the log
+	want := &api.Record{
+		Value: []byte("hello world"),
+	}
+
+	// Produce the record using the client
+	produce, err := client.Produce(ctx, &api.ProduceRequest{Record: want})
+	// Assert no error occurred during the produce operation
+	require.NoError(t, err)
+
+	// Attempt to consume the record we just produced
+	consume, err := client.Consume(ctx, &api.ConsumeRequest{Offset: produce.Offset})
+
+	// Assert no error occurred during the consume operation
+	require.NoError(t, err)
+
+	// Verify the consumed record matches what we produced
+	require.Equal(t, want.Value, consume.Record.Value)
+}
+
 */

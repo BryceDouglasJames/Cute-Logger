@@ -81,17 +81,32 @@ func NewGRPCServer(opts ...Option) (*grpcServer, error) {
 
 // Produce handles the gRPC call for producing (appending) a record to the commit log
 func (s *grpcServer) Produce(ctx context.Context, req *api.ProduceRequest) (*api.ProduceResponse, error) {
-
-	// Append the record contained in the request to the commit log
-	offset, err := s.CommitLog.Append(req.Record)
-
-	// If there's an error appending the record, return the error immediately
-	if err != nil {
-		return nil, err
+	// Validate the incoming request
+	if req == nil || req.Record == nil {
+		log.Println("Invalid request: request or request record is nil")
+		return nil, status.Errorf(codes.InvalidArgument, "request and request record must not be nil")
 	}
 
-	// If the append is successful, return a ProduceResponse with the offset of the appended record
-	return &api.ProduceResponse{Offset: offset}, nil
+	// Use the context to support cancellation and deadlines
+	select {
+	case <-ctx.Done():
+		log.Println("Request cancelled or deadline exceeded")
+		return nil, ctx.Err()
+	default:
+		// Continue if the context is not done
+	}
+
+	// Append the record contained in the request to the commit log
+	offset, err := s.CommitLog.Append(req.Record) // Assuming Append supports context
+	if err != nil {
+		log.Printf("Error appending to commit log: %v", err)
+		return nil, status.Errorf(codes.Internal, "error appending to commit log: %v", err)
+	}
+
+	// If the append is successful, construct and return a ProduceResponse with the offset of the appended record
+	response := &api.ProduceResponse{Offset: offset}
+	log.Printf("Record appended to commit log at offset %d", offset)
+	return response, nil
 }
 
 func (s *grpcServer) ProduceStream(stream api.Log_ProduceStreamServer) error {
@@ -142,4 +157,36 @@ func (s *grpcServer) Consume(ctx context.Context, req *api.ConsumeRequest) (*api
 
 	// If the read is successful, return a ConsumeResponse with the read record
 	return &api.ConsumeResponse{Record: record}, nil
+}
+
+// ConsumeStream streams log entries starting from the requested offset
+func (s *grpcServer) ConsumeStream(
+	req *api.ConsumeRequest,
+	stream api.Log_ConsumeStreamServer,
+) error {
+	for {
+		select {
+		// Check if the stream's context is done/cancelled
+		case <-stream.Context().Done():
+
+			// Stream is done, so return without error
+			return nil
+
+		default:
+			// Attempt to consume a log entry at the current offset
+			res, err := s.Consume(stream.Context(), req)
+			switch err.(type) {
+			case nil: // No error, proceed
+			default: // Any other error, return it
+				return err
+			}
+
+			// Send the consumed log entry back to the client
+			if err = stream.Send(res); err != nil {
+				return err // Error sending to stream, return the error
+			}
+
+			req.Offset++ // Increment the offset for the next iteration/request
+		}
+	}
 }

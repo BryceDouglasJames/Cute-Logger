@@ -22,6 +22,7 @@ const (
 	Log_Produce_FullMethodName       = "/record.Log/Produce"
 	Log_Consume_FullMethodName       = "/record.Log/Consume"
 	Log_ProduceStream_FullMethodName = "/record.Log/ProduceStream"
+	Log_ConsumeStream_FullMethodName = "/record.Log/ConsumeStream"
 )
 
 // LogClient is the client API for Log service.
@@ -38,6 +39,11 @@ type LogClient interface {
 	// Clients send a stream of ProduceRequest messages and receive a stream of ProduceResponse messages,
 	// allowing for efficient, bidirectional communication.
 	ProduceStream(ctx context.Context, opts ...grpc.CallOption) (Log_ProduceStreamClient, error)
+	// ConsumeStream streams log entries to a client, starting from a specified offset.
+	// Clients call this method to subscribe to log entries being appended to the log.
+	// The stream continues sending log entries to the client until the stream is closed
+	// by the client or an error occurs.
+	ConsumeStream(ctx context.Context, in *ConsumeRequest, opts ...grpc.CallOption) (Log_ConsumeStreamClient, error)
 }
 
 type logClient struct {
@@ -97,6 +103,38 @@ func (x *logProduceStreamClient) Recv() (*ProduceResponse, error) {
 	return m, nil
 }
 
+func (c *logClient) ConsumeStream(ctx context.Context, in *ConsumeRequest, opts ...grpc.CallOption) (Log_ConsumeStreamClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Log_ServiceDesc.Streams[1], Log_ConsumeStream_FullMethodName, opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &logConsumeStreamClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type Log_ConsumeStreamClient interface {
+	Recv() (*ConsumeResponse, error)
+	grpc.ClientStream
+}
+
+type logConsumeStreamClient struct {
+	grpc.ClientStream
+}
+
+func (x *logConsumeStreamClient) Recv() (*ConsumeResponse, error) {
+	m := new(ConsumeResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // LogServer is the server API for Log service.
 // All implementations must embed UnimplementedLogServer
 // for forward compatibility
@@ -111,6 +149,11 @@ type LogServer interface {
 	// Clients send a stream of ProduceRequest messages and receive a stream of ProduceResponse messages,
 	// allowing for efficient, bidirectional communication.
 	ProduceStream(Log_ProduceStreamServer) error
+	// ConsumeStream streams log entries to a client, starting from a specified offset.
+	// Clients call this method to subscribe to log entries being appended to the log.
+	// The stream continues sending log entries to the client until the stream is closed
+	// by the client or an error occurs.
+	ConsumeStream(*ConsumeRequest, Log_ConsumeStreamServer) error
 	mustEmbedUnimplementedLogServer()
 }
 
@@ -126,6 +169,9 @@ func (UnimplementedLogServer) Consume(context.Context, *ConsumeRequest) (*Consum
 }
 func (UnimplementedLogServer) ProduceStream(Log_ProduceStreamServer) error {
 	return status.Errorf(codes.Unimplemented, "method ProduceStream not implemented")
+}
+func (UnimplementedLogServer) ConsumeStream(*ConsumeRequest, Log_ConsumeStreamServer) error {
+	return status.Errorf(codes.Unimplemented, "method ConsumeStream not implemented")
 }
 func (UnimplementedLogServer) mustEmbedUnimplementedLogServer() {}
 
@@ -202,6 +248,27 @@ func (x *logProduceStreamServer) Recv() (*ProduceRequest, error) {
 	return m, nil
 }
 
+func _Log_ConsumeStream_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ConsumeRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(LogServer).ConsumeStream(m, &logConsumeStreamServer{stream})
+}
+
+type Log_ConsumeStreamServer interface {
+	Send(*ConsumeResponse) error
+	grpc.ServerStream
+}
+
+type logConsumeStreamServer struct {
+	grpc.ServerStream
+}
+
+func (x *logConsumeStreamServer) Send(m *ConsumeResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 // Log_ServiceDesc is the grpc.ServiceDesc for Log service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -224,6 +291,11 @@ var Log_ServiceDesc = grpc.ServiceDesc{
 			Handler:       _Log_ProduceStream_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
+		},
+		{
+			StreamName:    "ConsumeStream",
+			Handler:       _Log_ConsumeStream_Handler,
+			ServerStreams: true,
 		},
 	},
 	Metadata: "record.proto",
