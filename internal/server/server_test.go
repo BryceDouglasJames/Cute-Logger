@@ -2,39 +2,13 @@ package server
 
 import (
 	"context"
-	"errors"
+	"os"
 	"testing"
 
 	api "github.com/BryceDouglasJames/Cute-Logger/api"
+	log "github.com/BryceDouglasJames/Cute-Logger/internal/logger"
 	"github.com/stretchr/testify/require"
 )
-
-// **--**--**--**--**--**--**--**--**--**--**--**--**--**--**--**--**--**--**--**--**
-// Declare in memory example of the commit log for testing purposes
-type inMemoryCommitLog struct {
-	records []*api.Record
-}
-
-func newInMemoryCommitLog() *inMemoryCommitLog {
-	return &inMemoryCommitLog{
-		records: []*api.Record{},
-	}
-}
-
-func (log *inMemoryCommitLog) Append(record *api.Record) (uint64, error) {
-	offset := uint64(len(log.records))
-	log.records = append(log.records, record)
-	return offset, nil
-}
-
-func (log *inMemoryCommitLog) Read(offset uint64) (*api.Record, error) {
-	if offset >= uint64(len(log.records)) {
-		return nil, errors.New("offset out of bounds")
-	}
-	return log.records[offset], nil
-}
-
-// **--**--**--**--**--**--**--**--**--**--**--**--**--**--**--**--**--**--**--**--**
 
 func TestNewGRPCServer(t *testing.T) {
 	// Create server with options
@@ -44,11 +18,17 @@ func TestNewGRPCServer(t *testing.T) {
 }
 
 func TestGrpcServerProduceAndConsume(t *testing.T) {
-	// Setup in-memory commit log
-	commitLog := newInMemoryCommitLog()
+	// Create a temporary directory for testing
+	tempDir, err := os.MkdirTemp("", "log_test_again")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	// Create a new Log instance with the temporary directory
+	clog, err := log.NewLog(tempDir)
+	require.NoError(t, err)
 
 	// Initialize grpcServer with in-memory commit log
-	server, err := NewGRPCServer(WithCommitLog(commitLog))
+	server, err := NewGRPCServer(WithCommitLog(clog))
 	require.NoError(t, err)
 
 	// Test Produce
@@ -64,70 +44,3 @@ func TestGrpcServerProduceAndConsume(t *testing.T) {
 	require.NotNil(t, consumeResp)
 	require.Equal(t, record.Value, consumeResp.Record.Value)
 }
-
-// TODO: Gotta fix this and figure out GoMock before moving on
-/*
-func TestProduceStream(t *testing.T) {
-	// This uses gomock to simulate incoming stream requests and validate the behavior of the server in handling streaming data production.
-
-	// Initialize a new mock controller with the current testing context
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	// Create a new mock instance of the ProduceStreamServer to simulate client requests
-	mockStream := NewMockLog_ProduceStreamServer(ctrl)
-
-	// Create server with options
-	s, err := NewGRPCServer()
-	require.NoError(t, err)
-	require.NotNil(t, s)
-
-	// Define a request with a sample record to be sent to the server
-	req := &api.ProduceRequest{
-		Record: &api.Record{Value: []byte("test data")},
-	}
-
-	// Define the expected response from the server after processing the request
-	res := &api.ProduceResponse{Offset: 0}
-
-	// Set up the expected sequence of interactions between the test and the mock stream.
-	// This includes receiving a request, getting the context, sending a response, and simulating the end of the stream.
-	gomock.InOrder(
-		mockStream.EXPECT().Recv().Return(req, nil),
-		mockStream.EXPECT().Context().Return(context.Background()),
-		mockStream.EXPECT().Send(res).Return(nil),
-		mockStream.EXPECT().Recv().Return(nil, io.EOF),
-	)
-
-	// Call the ProduceStream method with the mocked stream and check for errors
-	err = s.ProduceStream(mockStream)
-	if err != nil {
-		t.Fatalf("ProduceStream failed: %v", err)
-	}
-}
-
-func testProduceConsume(t *testing.T, client api.LogClient, config *Config) {
-	// Establish a background context for the test
-	ctx := context.Background()
-
-	// Define the record we want to produce to the log
-	want := &api.Record{
-		Value: []byte("hello world"),
-	}
-
-	// Produce the record using the client
-	produce, err := client.Produce(ctx, &api.ProduceRequest{Record: want})
-	// Assert no error occurred during the produce operation
-	require.NoError(t, err)
-
-	// Attempt to consume the record we just produced
-	consume, err := client.Consume(ctx, &api.ConsumeRequest{Offset: produce.Offset})
-
-	// Assert no error occurred during the consume operation
-	require.NoError(t, err)
-
-	// Verify the consumed record matches what we produced
-	require.Equal(t, want.Value, consume.Record.Value)
-}
-
-*/
