@@ -23,6 +23,8 @@ func TestServer(t *testing.T) {
 		"produce/consume a message to/from the log succeeds": testProduceConsume,
 		"raw gRPC server produce and consume":                testRawGrpcServerProduceAndConsume,
 		"testing gRPC produce stream with a mock server":     testProduceStreamWithMockServer,
+		"raw gRPC server streaming produce and consume":      testRawGrpcServerStreamProduceAndConsume,
+		//"raw gRPC server streaming stress test on produce and consume": testRawGrpcServerStreamProduceAndConsumeStressTest,
 	} {
 		t.Run(scenario, func(t *testing.T) {
 			client, teardown := setupTest(t, nil)
@@ -191,3 +193,97 @@ func testProduceStreamWithMockServer(t *testing.T, _ api.LogClient, _ context.Co
 		t.Fatalf("ProduceStream failed: %v", err)
 	}
 }
+
+func testRawGrpcServerStreamProduceAndConsume(t *testing.T, client api.LogClient, ctx context.Context) {
+	// Test ProduceStream
+	produceStream, err := client.ProduceStream(ctx)
+	require.NoError(t, err)
+
+	// Send multiple records through the produce stream
+	want := []*api.Record{
+		{Value: []byte("hello")},
+		{Value: []byte("world")},
+	}
+	for _, record := range want {
+		err := produceStream.Send(&api.ProduceRequest{Record: record})
+		require.NoError(t, err)
+	}
+	err = produceStream.CloseSend()
+	require.NoError(t, err)
+
+	// Test ConsumeStream starting from offset 0
+	consumeStream, err := client.ConsumeStream(ctx, &api.ConsumeRequest{Offset: 0})
+	require.NoError(t, err)
+
+	// Receive records from the consume stream and verify they match what was sent
+	for i := 0; i < len(want); i++ {
+		resp, err := consumeStream.Recv()
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.Equal(t, want[i].Value, resp.Record.Value)
+	}
+}
+
+/*
+* Working on stress test
+*
+func testRawGrpcServerStreamProduceAndConsumeStressTest(t *testing.T, client api.LogClient, ctx context.Context) {
+	recordCount := 10000 // Number of records for the stress test
+	workers := 10        // Number of concurrent workers
+
+	startTime := time.Now()
+
+	var wg sync.WaitGroup
+	recordsPerWorker := recordCount / workers
+
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func(workerID int) {
+			defer wg.Done()
+
+			produceStream, err := client.ProduceStream(ctx)
+			require.NoError(t, err)
+
+			for j := 0; j < recordsPerWorker; j++ {
+				record := &api.Record{Value: []byte(fmt.Sprintf("message %d from worker %d", j, workerID))}
+				err := produceStream.Send(&api.ProduceRequest{Record: record})
+				require.NoError(t, err)
+
+				res, err := produceStream.Recv()
+				require.NoError(t, err)
+				require.GreaterOrEqual(t, res.Offset, uint64(0), "Expected valid offset")
+			}
+			err = produceStream.CloseSend()
+			require.NoError(t, err)
+		}(i)
+	}
+
+	wg.Wait()
+
+	// Measure time taken to produce records
+	produceDuration := time.Since(startTime)
+	fmt.Printf("Produced %d records with %d workers in %v\n", recordCount, workers, produceDuration)
+
+	// Consume records
+	consumeStream, err := client.ConsumeStream(ctx, &api.ConsumeRequest{Offset: 0})
+	require.NoError(t, err)
+
+	consumeCount := 0
+	for {
+		_, err := consumeStream.Recv()
+		if err == io.EOF {
+			break
+		}
+		require.NoError(t, err)
+		consumeCount++
+	}
+
+	// Ensure all records were consumed
+	require.Equal(t, recordCount, consumeCount, "Expected to consume the same number of records as produced")
+
+	// Measure total time taken for the test
+	totalDuration := time.Since(startTime)
+	fmt.Printf("Stress test completed: produced and consumed %d records in %v\n", recordCount, totalDuration)
+}
+*
+*/
