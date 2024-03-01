@@ -111,7 +111,6 @@ func (s *grpcServer) Produce(ctx context.Context, req *api.ProduceRequest) (*api
 
 func (s *grpcServer) ProduceStream(stream api.Log_ProduceStreamServer) error {
 	for {
-
 		// Attempt to receive a message from the stream
 		req, err := stream.Recv()
 		if err != nil {
@@ -160,10 +159,7 @@ func (s *grpcServer) Consume(ctx context.Context, req *api.ConsumeRequest) (*api
 }
 
 // ConsumeStream streams log entries starting from the requested offset
-func (s *grpcServer) ConsumeStream(
-	req *api.ConsumeRequest,
-	stream api.Log_ConsumeStreamServer,
-) error {
+func (s *grpcServer) ConsumeStream(req *api.ConsumeRequest, stream api.Log_ConsumeStreamServer) error {
 	for {
 		select {
 		// Check if the stream's context is done/cancelled

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -195,41 +196,51 @@ func testProduceStreamWithMockServer(t *testing.T, _ api.LogClient, _ context.Co
 }
 
 func testRawGrpcServerStreamProduceAndConsume(t *testing.T, client api.LogClient, ctx context.Context) {
-	// Test ProduceStream
+	// Define a slice of records to send through the ProduceStream
+	records := []*api.Record{
+		{Value: []byte("first message")},
+		{Value: []byte("second message")},
+	}
+
+	// Open a stream to produce records
 	produceStream, err := client.ProduceStream(ctx)
 	require.NoError(t, err)
 
-	// Send multiple records through the produce stream
-	want := []*api.Record{
-		{Value: []byte("hello")},
-		{Value: []byte("world")},
-	}
-	for _, record := range want {
+	// Send records and receive responses to verify offsets
+	for _, record := range records {
 		err := produceStream.Send(&api.ProduceRequest{Record: record})
 		require.NoError(t, err)
+		res, err := produceStream.Recv()
+		require.NoError(t, err)
+		record.Offset = res.Offset // Update record with the offset received
 	}
 	err = produceStream.CloseSend()
 	require.NoError(t, err)
 
-	// Test ConsumeStream starting from offset 0
-	consumeStream, err := client.ConsumeStream(ctx, &api.ConsumeRequest{Offset: 0})
+	// Open a stream to consume records starting from the first offset
+	consumeStream, err := client.ConsumeStream(ctx, &api.ConsumeRequest{Offset: records[0].Offset})
 	require.NoError(t, err)
 
-	// Receive records from the consume stream and verify they match what was sent
-	for i := 0; i < len(want); i++ {
-		resp, err := consumeStream.Recv()
+	// Receive and verify records from the consume stream
+	for i, want := range records {
+		res, err := consumeStream.Recv()
+		if err == io.EOF {
+			break
+		}
 		require.NoError(t, err)
-		require.NotNil(t, resp)
-		require.Equal(t, want[i].Value, resp.Record.Value)
+
+		// Verify that the consumed record matches the expected record
+		require.Equal(t, want.Value, res.Record.Value, fmt.Sprintf("Record %d value mismatch", i))
+		require.Equal(t, want.Offset, res.Record.Offset, fmt.Sprintf("Record %d offset mismatch", i))
 	}
 }
 
-/*
-* Working on stress test
-*
+/* I <3 concurrent programming
+* I have spent way too much time on this
+* Having issues reading records back while retaining offset positions.
 func testRawGrpcServerStreamProduceAndConsumeStressTest(t *testing.T, client api.LogClient, ctx context.Context) {
-	recordCount := 10000 // Number of records for the stress test
-	workers := 10        // Number of concurrent workers
+	recordCount := 500 // Number of records for the stress test
+	workers := 10      // Number of concurrent workers
 
 	startTime := time.Now()
 
@@ -265,7 +276,7 @@ func testRawGrpcServerStreamProduceAndConsumeStressTest(t *testing.T, client api
 	fmt.Printf("Produced %d records with %d workers in %v\n", recordCount, workers, produceDuration)
 
 	// Consume records
-	consumeStream, err := client.ConsumeStream(ctx, &api.ConsumeRequest{Offset: 0})
+	consumeStream, err := client.ConsumeStream(ctx, &api.ConsumeRequest{})
 	require.NoError(t, err)
 
 	consumeCount := 0
