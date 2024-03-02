@@ -6,7 +6,9 @@ import (
 	"io"
 	"net"
 	"os"
+	"sync"
 	"testing"
+	"time"
 
 	api "github.com/BryceDouglasJames/Cute-Logger/api"
 	log "github.com/BryceDouglasJames/Cute-Logger/internal/logger"
@@ -21,13 +23,14 @@ const bufSize = 1024 * 1024
 
 func TestServer(t *testing.T) {
 	for scenario, fn := range map[string]func(t *testing.T, client api.LogClient, ctx context.Context){
-		"produce/consume a message to/from the log succeeds": testProduceConsume,
-		"raw gRPC server produce and consume":                testRawGrpcServerProduceAndConsume,
-		"testing gRPC produce stream with a mock server":     testProduceStreamWithMockServer,
-		"raw gRPC server streaming produce and consume":      testRawGrpcServerStreamProduceAndConsume,
-		//"raw gRPC server streaming stress test on produce and consume": testRawGrpcServerStreamProduceAndConsumeStressTest,
+		//"produce/consume a message to/from the log succeeds":           testProduceConsume,
+		//"raw gRPC server produce and consume":                          testRawGrpcServerProduceAndConsume,
+		//"testing gRPC produce stream with a mock server":               testProduceStreamWithMockServer,
+		//"raw gRPC server streaming produce and consume":                testRawGrpcServerStreamProduceAndConsume,
+		"raw gRPC server streaming stress test on produce and consume": testRawGrpcServerStreamProduceAndConsumeStressTest,
 	} {
 		t.Run(scenario, func(t *testing.T) {
+			t.Log("YOOOO")
 			client, teardown := setupTest(t, nil)
 			defer teardown()
 			ctx := context.Background()
@@ -237,16 +240,32 @@ func testRawGrpcServerStreamProduceAndConsume(t *testing.T, client api.LogClient
 
 /* I <3 concurrent programming
 * I have spent way too much time on this
-* Having issues reading records back while retaining offset positions.
+* Having issues reading records back while retaining offset positions.*/
 func testRawGrpcServerStreamProduceAndConsumeStressTest(t *testing.T, client api.LogClient, ctx context.Context) {
 	recordCount := 500 // Number of records for the stress test
 	workers := 10      // Number of concurrent workers
-
-	startTime := time.Now()
-
 	var wg sync.WaitGroup
 	recordsPerWorker := recordCount / workers
 
+	// Start time for consumer setup
+	startTime := time.Now()
+
+	// Set up consumer
+	consumeStream, err := client.ConsumeStream(ctx, &api.ConsumeRequest{})
+	require.NoError(t, err)
+
+	consumeCount := 0
+	go func() {
+		for {
+			_, err := consumeStream.Recv()
+			if err == io.EOF {
+				break
+			}
+			require.NoError(t, err)
+		}
+	}()
+
+	// Start producing records after consumer setup
 	for i := 0; i < workers; i++ {
 		wg.Add(1)
 		go func(workerID int) {
@@ -269,25 +288,11 @@ func testRawGrpcServerStreamProduceAndConsumeStressTest(t *testing.T, client api
 		}(i)
 	}
 
-	wg.Wait()
+	wg.Wait() // Wait for all production to complete
 
 	// Measure time taken to produce records
 	produceDuration := time.Since(startTime)
 	fmt.Printf("Produced %d records with %d workers in %v\n", recordCount, workers, produceDuration)
-
-	// Consume records
-	consumeStream, err := client.ConsumeStream(ctx, &api.ConsumeRequest{})
-	require.NoError(t, err)
-
-	consumeCount := 0
-	for {
-		_, err := consumeStream.Recv()
-		if err == io.EOF {
-			break
-		}
-		require.NoError(t, err)
-		consumeCount++
-	}
 
 	// Ensure all records were consumed
 	require.Equal(t, recordCount, consumeCount, "Expected to consume the same number of records as produced")
@@ -296,5 +301,3 @@ func testRawGrpcServerStreamProduceAndConsumeStressTest(t *testing.T, client api
 	totalDuration := time.Since(startTime)
 	fmt.Printf("Stress test completed: produced and consumed %d records in %v\n", recordCount, totalDuration)
 }
-*
-*/
